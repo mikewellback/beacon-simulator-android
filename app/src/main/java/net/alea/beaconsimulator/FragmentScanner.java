@@ -87,6 +87,7 @@ import net.alea.beaconsimulator.bluetooth.ByteTools;
 import net.alea.beaconsimulator.bluetooth.ComparableScanResult;
 import net.alea.beaconsimulator.bluetooth.IBeaconParser;
 import net.alea.beaconsimulator.bluetooth.model.AltBeacon;
+import net.alea.beaconsimulator.bluetooth.model.B810Beacon;
 import net.alea.beaconsimulator.bluetooth.model.BeaconType;
 import net.alea.beaconsimulator.bluetooth.model.IBeacon;
 import net.alea.beaconsimulator.component.DialogAskScanPermission;
@@ -433,6 +434,9 @@ public class FragmentScanner extends Fragment {
         }
 
         private int getBeaconTypeImage(ScanResult scanResult) {
+            if (B810Beacon.parseRecord(scanResult.getScanRecord()) != null) {
+                return BeaconType.b810beacon.getImageResource();
+            }
             if (AltBeacon.parseRecord(scanResult.getScanRecord()) != null) {
                 return BeaconType.altbeacon.getImageResource();
             }

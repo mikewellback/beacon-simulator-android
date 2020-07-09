@@ -74,11 +74,13 @@ import net.alea.beaconsimulator.bluetooth.BtNumbers;
 import net.alea.beaconsimulator.bluetooth.ByteTools;
 import net.alea.beaconsimulator.bluetooth.IBeaconParser;
 import net.alea.beaconsimulator.bluetooth.model.AltBeacon;
+import net.alea.beaconsimulator.bluetooth.model.B810Beacon;
 import net.alea.beaconsimulator.bluetooth.model.BeaconModel;
 import net.alea.beaconsimulator.bluetooth.model.BeaconType;
 import net.alea.beaconsimulator.bluetooth.model.IBeacon;
 import net.alea.beaconsimulator.component.DialogCopyBeacon;
 import net.alea.beaconsimulator.component.ViewEditAltBeacon;
+import net.alea.beaconsimulator.component.ViewEditB810Beacon;
 import net.alea.beaconsimulator.component.ViewEditEddystoneTlm;
 import net.alea.beaconsimulator.component.ViewEditEddystoneUid;
 import net.alea.beaconsimulator.component.ViewEditEddystoneUrl;
@@ -218,6 +220,7 @@ public class FragmentDetailedScan extends Fragment {
                 fillFlagsCard((Flags)structure, cardContainer);
             }
             else if (structure instanceof ADManufacturerSpecific) {
+                B810Beacon b810Beacon = B810Beacon.parseRecord(mScanResult.getScanRecord());
                 AltBeacon altBeacon = AltBeacon.parseRecord(mScanResult.getScanRecord());
                 IBeacon iBeacon = new IBeaconParser().parseScanRecord(mScanResult.getScanRecord());
                 if (iBeacon != null) {
@@ -229,6 +232,11 @@ public class FragmentDetailedScan extends Fragment {
                     mBeaconModel = new BeaconModel(BeaconType.altbeacon);
                     mBeaconModel.setAltBeacon(altBeacon);
                     fillAltBeaconCard(mBeaconModel, cardContainer);
+                }
+                else if (b810Beacon != null) {
+                    mBeaconModel = new BeaconModel(BeaconType.b810beacon);
+                    mBeaconModel.setB810Beacon(b810Beacon);
+                    fillB810BeaconCard(mBeaconModel, cardContainer);
                 }
                 else {
                     fillManufacturerCard((ADManufacturerSpecific)structure, cardContainer);
@@ -333,6 +341,12 @@ public class FragmentDetailedScan extends Fragment {
         cardContainer.addView(altBeaconView);
     }
 
+    private void fillB810BeaconCard(BeaconModel model, ViewGroup cardContainer) {
+        ViewEditB810Beacon b810BeaconView = new ViewEditB810Beacon(getContext());
+        b810BeaconView.loadModelFrom(model);
+        b810BeaconView.setEditMode(false);
+        cardContainer.addView(b810BeaconView);
+    }
 
     private void fillNameCard(LocalName localName, ViewGroup cardContainer) {
         View view = mLayoutInflater.inflate(R.layout.card_beacon_name, cardContainer, false);

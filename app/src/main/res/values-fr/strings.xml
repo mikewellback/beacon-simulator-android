@@ -60,6 +60,7 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="beaconedit_confirmation_title">Edition en cours</string>
     <string name="beaconcopy_askname">Veuillez entrer un nom pour copier ce beacon.</string>
     <string name="action_edit">Mode édition</string>
+    <string name="all_uuid_reset">Réinitialiser un UUID</string>
     <string name="all_uuid_generation">Générer un UUID</string>
     <string name="beaconcreate_choice">Sélectionner un modèle pour créer un nouveau beacon.</string>
     <string name="card_settings_title">Paramètres de diffusion</string>
@@ -71,6 +72,7 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="all_beacon_type">Type du beacon</string>
     <string name="all_major">Majeur</string>
     <string name="all_minor">Mineur</string>
+    <string name="all_serial">Sériel</string>
     <string name="all_tx_power">Puissance émission</string>
     <string name="card_settings_connectable">Connectable</string>
     <string name="card_settings_tx_power">Puissance de transmission</string>
@@ -184,6 +186,7 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="card_eddystone_tlm_uptime">Uptime en 0.1 secondes</string>
     <string name="edit_error_unsigned_int">Entre 0 et 4 294 967 295</string>
     <string name="edit_error_unsigned_short">Entre 0 et 65 535.</string>
+    <string name="edit_error_8_hex_characters">8 char. hex.</string>
     <string name="item_model_params_eddystoneTLM">Voltage : %1$,dmV Total : %2$,d</string>
     <string name="item_model_params_eddystoneTLM_sub">Température : %1$,.1f°C Uptime : %2$,.1fs</string>
     <string name="card_eddystone_eid_idkey_generation">Générer une clef</string>

@@ -76,6 +76,7 @@ public class BeaconModel implements Parcelable {
     private EddystoneEID eddystoneEID;
     private IBeacon ibeacon;
     private AltBeacon altbeacon;
+    private B810Beacon b810beacon;
 
     private BeaconModel() {}
 
@@ -113,6 +114,9 @@ public class BeaconModel implements Parcelable {
             case altbeacon:
                 this.altbeacon = new AltBeacon();
                 break;
+            case b810beacon:
+                this.b810beacon = new B810Beacon();
+                settings.setConnectable(true);
             default:
                 sLogger.warn("Beacon type {} is not managed by the BeaconModel", type);
         }
@@ -136,6 +140,9 @@ public class BeaconModel implements Parcelable {
     }
 
     public Settings getSettings() {
+        if (b810beacon != null) {
+            settings.setConnectable(true);
+        }
         return settings;
     }
 
@@ -191,6 +198,15 @@ public class BeaconModel implements Parcelable {
         this.altbeacon = altbeacon;
     }
 
+    public B810Beacon getB810beacon() {
+        return b810beacon;
+    }
+
+    public void setB810Beacon(B810Beacon b810beacon) {
+        settings.setConnectable(b810beacon != null);
+        this.b810beacon = b810beacon;
+    }
+
 
     public String generateBeaconName() {
         final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
@@ -232,6 +248,7 @@ public class BeaconModel implements Parcelable {
     @Nullable
     public ExtendedAdvertiseData generateADData() {
         AdvertiseDataGenerator conversion = null;
+        boolean isB810 = false;
         switch (type) {
             case eddystoneTLM:
                 conversion = eddystoneTLM;
@@ -251,12 +268,20 @@ public class BeaconModel implements Parcelable {
             case altbeacon:
                 conversion = altbeacon;
                 break;
+            case b810beacon:
+                isB810 = true;
+                conversion = b810beacon;
+                break;
             case raw:
             default:
                 sLogger.warn("Not implemented");
         }
         if (conversion != null) {
-            return new ExtendedAdvertiseData(conversion.generateAdvertiseData());
+            ExtendedAdvertiseData ead = new ExtendedAdvertiseData(conversion.generateAdvertiseData());
+            if (isB810) {
+                ead.setLocalName("SmartTag");
+            }
+            return ead;
         }
         else {
             return null;
@@ -280,6 +305,7 @@ public class BeaconModel implements Parcelable {
         dest.writeParcelable(this.eddystoneEID, flags);
         dest.writeParcelable(this.ibeacon, flags);
         dest.writeParcelable(this.altbeacon, flags);
+        dest.writeParcelable(this.b810beacon, flags);
     }
 
     protected BeaconModel(Parcel in) {
@@ -294,6 +320,7 @@ public class BeaconModel implements Parcelable {
         this.eddystoneEID = in.readParcelable(EddystoneEID.class.getClassLoader());
         this.ibeacon = in.readParcelable(IBeacon.class.getClassLoader());
         this.altbeacon = in.readParcelable(AltBeacon.class.getClassLoader());
+        this.b810beacon = in.readParcelable(B810Beacon.class.getClassLoader());
     }
 
     public static final Creator<BeaconModel> CREATOR = new Creator<BeaconModel>() {

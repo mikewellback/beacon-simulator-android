@@ -51,16 +51,19 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="all_128bit" translatable="false">128 bit</string>
     <string name="all_ibeacon" translatable="false">iBeacon</string>
     <string name="all_altbeacon" translatable="false">AltBeacon</string>
+    <string name="all_b810beacon" translatable="false">B810Beacon</string>
     <string name="all_name">Name</string>
     <string name="all_uuid" translatable="false">UUID</string>
     <string name="all_major">Major</string>
     <string name="all_minor">Minor</string>
+    <string name="all_serial">Serial</string>
     <string name="all_tx_power">Tx Power</string>
     <string name="all_eddystone_uid" translatable="false">Eddystone UID</string>
     <string name="all_eddystone_tlm" translatable="false">Eddystone TLM</string>
     <string name="all_eddystone_eid" translatable="false">Eddystone EID</string>
     <string name="all_eddystone_url" translatable="false">Eddystone URL</string>
     <string name="all_rssi" translatable="false">RSSI</string>
+    <string name="all_uuid_reset">Reset UUID</string>
     <string name="all_uuid_generation">Generate UUID</string>
     <string name="all_url_shortener">Minify</string>
     <string name="all_beacon_type">Beacon Type</string>
@@ -198,6 +201,7 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="edit_error_identity_key_size">Hex characters and length of 32</string>
     <string name="edit_error_signed_byte">Between -128 and 127.</string>
     <string name="edit_error_unsigned_short">Between 0 and 65 535.</string>
+    <string name="edit_error_8_hex_characters">Hex characters and length of 8.</string>
     <string name="edit_error_unsigned_int">Between 0 and 4 294 967 295</string>
     <string name="edit_error_signed_int">Between -2 147 483 648  and 2 147 483 647</string>
     <string name="edit_error_uid_namespace">20 hex chars (10 bytes)</string>

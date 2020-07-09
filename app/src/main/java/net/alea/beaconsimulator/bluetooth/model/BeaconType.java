@@ -51,6 +51,7 @@ public enum BeaconType {
     eddystoneEID (R.drawable.ic_beacon_eddystone_eid),
     ibeacon (R.drawable.ic_beacon_ibeacon),
     altbeacon (R.drawable.ic_beacon_altbeacon),
+    b810beacon (R.drawable.ic_beacon_b810beacon),
     raw (R.drawable.ic_beacon_misc);
 
     private final int mImageResource;

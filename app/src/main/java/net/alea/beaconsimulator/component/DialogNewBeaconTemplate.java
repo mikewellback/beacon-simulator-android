@@ -131,6 +131,14 @@ public class DialogNewBeaconTemplate extends BottomSheetDialogFragment {
                 dismiss();
             }
         });
+        TextView b810beaconChoice = (TextView)contentView.findViewById(R.id.newbeacon_textview_b810beacon);
+        b810beaconChoice.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ActivityBeaconEdit.createNewBeacon(getActivity(), BeaconType.b810beacon);
+                dismiss();
+            }
+        });
         return contentView;
     }
 }

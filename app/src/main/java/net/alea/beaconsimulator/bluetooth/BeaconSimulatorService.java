@@ -47,6 +47,8 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothGattServer;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
@@ -73,6 +75,7 @@ import net.alea.beaconsimulator.R;
 import net.alea.beaconsimulator.bluetooth.event.BeaconChangedEvent;
 import net.alea.beaconsimulator.bluetooth.event.BeaconDeletedEvent;
 import net.alea.beaconsimulator.bluetooth.event.BroadcastChangedEvent;
+import net.alea.beaconsimulator.bluetooth.model.B810Beacon;
 import net.alea.beaconsimulator.bluetooth.model.BeaconModel;
 import net.alea.beaconsimulator.bluetooth.model.BeaconType;
 import net.alea.beaconsimulator.event.UserRequestStartEvent;
@@ -117,6 +120,8 @@ public class BeaconSimulatorService extends Service {
     private Map<UUID, Long> mAdvertiseStartTimestamp;
     private Map<UUID, PendingIntent> mScheduledPendingIntents;
     private BeaconStore mBeaconStore;
+
+    private BluetoothGattServer mGattServer;
 
     // TODO Should I deprecate ServiceControl in favor of static methods?
     public class ServiceControl extends Binder {
@@ -272,7 +277,7 @@ public class BeaconSimulatorService extends Service {
         final ExtendedAdvertiseData exAdvertiseData =  model.generateADData();
         final AdvertiseData advertiseData = exAdvertiseData.getAdvertiseData();
         final String localName = exAdvertiseData.getLocalName();
-        if (exAdvertiseData.getAdvertiseData().getIncludeDeviceName()) {
+        if ((localName != null && localName.trim().length() > 0) || exAdvertiseData.getAdvertiseData().getIncludeDeviceName()) {
             final String backupName = mBtAdapter.getName();
             if (localName != null) {
                 mBtAdapter.setName(localName);
@@ -318,6 +323,9 @@ public class BeaconSimulatorService extends Service {
             return;
         }
         if (mAdvertiseCallbacks.size() == 0) {
+            if (mGattServer != null) {
+                mGattServer.close();
+            }
             stopForeground(true);
             if (! ignoreServiceStartId) {
                 stopSelf(serviceStartId);
@@ -443,6 +451,17 @@ public class BeaconSimulatorService extends Service {
                 EventBus.getDefault().post(new BroadcastChangedEvent(_id, true, mAdvertiseCallbacks.size()));
                 // Prepare and display notification
                 updateNotification();
+
+                final BeaconModel model = mBeaconStore.getBeacon(_id);
+                if (model != null && BeaconType.b810beacon.equals(model.getType())) {
+                    if (mGattServer == null) {
+                        BluetoothManager btManager = ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE));
+                        if (btManager != null) {
+                            mGattServer = btManager.openGattServer(BeaconSimulatorService.this, model.getB810beacon().gattCallback);
+                            B810Beacon.configureGatt(mGattServer);
+                        }
+                    }
+                }
             }
             sLogger.info("Success in starting broadcast, currently active: {}", mAdvertiseCallbacks.size());
         }

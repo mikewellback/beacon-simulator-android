@@ -62,6 +62,7 @@ import net.alea.beaconsimulator.bluetooth.model.BeaconModel;
 import net.alea.beaconsimulator.bluetooth.model.BeaconType;
 import net.alea.beaconsimulator.component.BeaconModelEditor;
 import net.alea.beaconsimulator.component.ViewEditAltBeacon;
+import net.alea.beaconsimulator.component.ViewEditB810Beacon;
 import net.alea.beaconsimulator.component.ViewEditEddystoneEid;
 import net.alea.beaconsimulator.component.ViewEditEddystoneTlm;
 import net.alea.beaconsimulator.component.ViewEditEddystoneUid;
@@ -151,6 +152,9 @@ public class FragmentBeaconEdit extends Fragment {
                 break;
             case altbeacon:
                 beaconModelView = new ViewEditAltBeacon(getContext());
+                break;
+            case b810beacon:
+                beaconModelView = new ViewEditB810Beacon(getContext());
                 break;
             case raw:
                 break;

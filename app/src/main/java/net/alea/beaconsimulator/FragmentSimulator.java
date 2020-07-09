@@ -75,6 +75,7 @@ import net.alea.beaconsimulator.bluetooth.BeaconStore;
 import net.alea.beaconsimulator.bluetooth.event.BeaconStoreSizeEvent;
 import net.alea.beaconsimulator.bluetooth.event.BroadcastChangedEvent;
 import net.alea.beaconsimulator.bluetooth.model.AltBeacon;
+import net.alea.beaconsimulator.bluetooth.model.B810Beacon;
 import net.alea.beaconsimulator.bluetooth.model.BeaconModel;
 import net.alea.beaconsimulator.bluetooth.model.BeaconType;
 import net.alea.beaconsimulator.bluetooth.model.EddystoneEID;
@@ -608,6 +609,16 @@ public class FragmentSimulator extends Fragment {
                             R.string.item_model_params_ibeacon_sub,
                             altBeacon.getMajor(),
                             altBeacon.getMinor());
+                    break;
+                case b810beacon:
+                    B810Beacon b810Beacon = beaconModel.getB810beacon();
+                    typeMessage = getString(
+                            R.string.item_model_params_ibeacon,
+                            b810Beacon.getBeaconNamespace().toString());
+                    subTypeMessage = getString(
+                            R.string.item_model_params_ibeacon_sub,
+                            b810Beacon.getMajor(),
+                            b810Beacon.getMinor());
                     break;
                 default:
             }
