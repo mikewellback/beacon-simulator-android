@@ -76,6 +76,7 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
     private final TextInputEditText mSerialValue;
     private final TextInputEditText mPowerValue;
     private final TextInputEditText mManufacturerIdValue;
+    private final TextInputEditText mTime;
     private final TextView mTxPowerInfo;
     private final Button mUuidButton;
 
@@ -84,60 +85,79 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
         LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View view = inflater.inflate(R.layout.card_beacon_b810beacon_edit, this);
 
-        mTxPowerInfo = (TextView)view.findViewById(R.id.cardb810beacon_textview_power);
-        mUuidLayout = (TextInputLayout)view.findViewById(R.id.cardb810beacon_textinputlayout_uuid);
-        mMajorLayout = (TextInputLayout)view.findViewById(R.id.cardb810beacon_textinputlayout_major);
-        mMinorLayout = (TextInputLayout)view.findViewById(R.id.cardb810beacon_textinputlayout_minor);
-        mSerialLayout = (TextInputLayout)view.findViewById(R.id.cardb810beacon_textinputlayout_serial);
-        mPowerLayout = (TextInputLayout)view.findViewById(R.id.cardb810beacon_textinputlayout_power);
-        mManufacturerIdLayout =  (TextInputLayout)view.findViewById(R.id.cardb810beacon_textinputlayout_manufacturerid);
-        mUuidValue = (TextInputEditText)view.findViewById(R.id.cardb810beacon_textinput_uuid);
+        mTxPowerInfo = (TextView) view.findViewById(R.id.cardb810beacon_textview_power);
+        mUuidLayout = (TextInputLayout) view.findViewById(R.id.cardb810beacon_textinputlayout_uuid);
+        mMajorLayout = (TextInputLayout) view.findViewById(R.id.cardb810beacon_textinputlayout_major);
+        mMinorLayout = (TextInputLayout) view.findViewById(R.id.cardb810beacon_textinputlayout_minor);
+        mSerialLayout = (TextInputLayout) view.findViewById(R.id.cardb810beacon_textinputlayout_serial);
+        mPowerLayout = (TextInputLayout) view.findViewById(R.id.cardb810beacon_textinputlayout_power);
+        mManufacturerIdLayout = (TextInputLayout) view.findViewById(R.id.cardb810beacon_textinputlayout_manufacturerid);
+        mUuidValue = (TextInputEditText) view.findViewById(R.id.cardb810beacon_textinput_uuid);
         mUuidValue.addTextChangedListener(new SimplifiedTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 checkUuidValue();
             }
         });
-        mMajorValue = (TextInputEditText)view.findViewById(R.id.cardb810beacon_textinput_major);
+        mMajorValue = (TextInputEditText) view.findViewById(R.id.cardb810beacon_textinput_major);
         mMajorValue.addTextChangedListener(new SimplifiedTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 calculateSerial();
             }
         });
-        mMinorValue = (TextInputEditText)view.findViewById(R.id.cardb810beacon_textinput_minor);
+        mMinorValue = (TextInputEditText) view.findViewById(R.id.cardb810beacon_textinput_minor);
         mMinorValue.addTextChangedListener(new SimplifiedTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 calculateSerial();
             }
         });
-        mSerialValue = (TextInputEditText)view.findViewById(R.id.cardb810beacon_textinput_serial);
+        mSerialValue = (TextInputEditText) view.findViewById(R.id.cardb810beacon_textinput_serial);
         mSerialValue.addTextChangedListener(new SimplifiedTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 checkSerialValue();
             }
         });
-        mPowerValue = (TextInputEditText)view.findViewById(R.id.cardb810beacon_textinput_power);
+        mPowerValue = (TextInputEditText) view.findViewById(R.id.cardb810beacon_textinput_power);
         mPowerValue.addTextChangedListener(new SimplifiedTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 checkPowerValue();
             }
         });
-        mManufacturerIdValue = (TextInputEditText)view.findViewById(R.id.cardb810beacon_textinput_manufacturerid);
+        mManufacturerIdValue = (TextInputEditText) view.findViewById(R.id.cardb810beacon_textinput_manufacturerid);
         mManufacturerIdValue.addTextChangedListener(new SimplifiedTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
                 checkManufacturerIdValue();
             }
         });
-        mUuidButton = (Button)view.findViewById(R.id.cardb810beacon_button_resetuuid);
+        mUuidButton = (Button) view.findViewById(R.id.cardb810beacon_button_resetuuid);
         mUuidButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 mUuidValue.setText(UUID.fromString("B810736B-11FC-85C3-1762-80DF658F0B31").toString());
+            }
+        });
+
+        mTime = view.findViewById(R.id.timeAccelerationEt);
+
+        view.findViewById(R.id.start_acceleration).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                int time = 0;
+                if (mTime.getText().toString() != null && !mTime.getText().toString().equals("")) {
+                    time = Integer.parseInt(mTime.getText().toString());
+                }
+                B810Beacon.sendAcceleration(time);
+            }
+        });
+        view.findViewById(R.id.stop).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                B810Beacon.sendParking();
             }
         });
     }
@@ -158,13 +178,14 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
 
     @Override
     public boolean saveModelTo(BeaconModel model) {
-        if ( ! checkAll() ) {
+        if (!checkAll()) {
             return false;
         }
         B810Beacon b810beacon = new B810Beacon();
         b810beacon.setBeaconNamespace(UUID.fromString(mUuidValue.getText().toString()));
         b810beacon.setMajor(Integer.parseInt(mMajorValue.getText().toString()));
         b810beacon.setMinor(Integer.parseInt(mMinorValue.getText().toString()));
+        b810beacon.setSerial(mSerialValue.getText().toString());
         b810beacon.setPower(Byte.parseByte(mPowerValue.getText().toString()));
         b810beacon.setManufacturerId(Integer.parseInt(mManufacturerIdValue.getText().toString()));
         model.setB810Beacon(b810beacon);
@@ -192,8 +213,7 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
             //noinspection ResultOfMethodCallIgnored
             UUID.fromString(uuid);
             mUuidLayout.setError(null);
-        }
-        catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             mUuidLayout.setError(getResources().getString(R.string.edit_error_uuid));
             return false;
         }
@@ -210,10 +230,9 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
         } catch (NumberFormatException e) {
             // not valid, isValid already false
         }
-        if ( isValid ) {
+        if (isValid) {
             mPowerLayout.setError(null);
-        }
-        else {
+        } else {
             mPowerLayout.setError(getResources().getString(R.string.edit_error_signed_byte));
         }
         return isValid;
@@ -229,10 +248,9 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
         } catch (NumberFormatException e) {
             // not valid, isValid already false
         }
-        if ( isValid ) {
+        if (isValid) {
             mMajorLayout.setError(null);
-        }
-        else {
+        } else {
             mMajorLayout.setError(getResources().getString(R.string.edit_error_unsigned_short));
         }
         return isValid;
@@ -248,10 +266,9 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
         } catch (NumberFormatException e) {
             // not valid, isValid already false
         }
-        if ( isValid ) {
+        if (isValid) {
             mMinorLayout.setError(null);
-        }
-        else {
+        } else {
             mMinorLayout.setError(getResources().getString(R.string.edit_error_unsigned_short));
         }
         return isValid;
@@ -276,7 +293,7 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
         } catch (NumberFormatException e) {
             // not valid, isValid already false
         }
-        if ( isValid ) {
+        if (isValid) {
             if (!String.valueOf(serialMajor).equals(mMajorValue.getText().toString())) {
                 mMajorValue.setText(String.valueOf(serialMajor));
             }
@@ -284,8 +301,7 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
                 mMinorValue.setText(String.valueOf(serialMinor));
             }
             mSerialValue.setError(null);
-        }
-        else {
+        } else {
             mSerialValue.setError(getResources().getString(R.string.edit_error_8_hex_characters));
         }
     }
@@ -303,7 +319,7 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
             } catch (NumberFormatException e) {
                 // not valid, isValid already false
             }
-            if ( isValid ) {
+            if (isValid) {
                 String major = Integer.toString(serialMajor, 16);
                 String minor = Integer.toString(serialMinor, 16);
                 String serial = ("1" + ("000" + major).substring(major.length()) + ("0000" + minor).substring(minor.length())).toUpperCase();
@@ -324,10 +340,9 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
         } catch (NumberFormatException e) {
             // not valid, isValid already false
         }
-        if ( isValid ) {
+        if (isValid) {
             mManufacturerIdLayout.setError(null);
-        }
-        else {
+        } else {
             mManufacturerIdLayout.setError(getResources().getString(R.string.edit_error_unsigned_short));
         }
         return isValid;
@@ -340,10 +355,12 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
 
     private abstract class SimplifiedTextWatcher implements TextWatcher {
         public void beforeTextChanged(CharSequence s, int start,
-                                      int count, int after) {}
-        public void onTextChanged(CharSequence s, int start, int before, int count) {}
-    }
+                                      int count, int after) {
+        }
 
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+        }
+    }
 
 
 }

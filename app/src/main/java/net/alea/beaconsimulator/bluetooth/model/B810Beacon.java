@@ -44,11 +44,13 @@ package net.alea.beaconsimulator.bluetooth.model;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.ScanRecord;
+import android.os.Handler;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.Log;
@@ -57,40 +59,45 @@ import android.util.SparseArray;
 import net.alea.beaconsimulator.bluetooth.AdvertiseDataGenerator;
 import net.alea.beaconsimulator.bluetooth.ByteTools;
 import net.alea.beaconsimulator.bluetooth.GattUtils;
+import net.alea.beaconsimulator.util.MathUtils;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.UUID;
 
 public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
 
-    public static final String     CHARACTERISTIC_DEVICE_NAME = "00002a00-0000-1000-8000-00805f9b34fb"; // SERVICE_GENERIC
-    public static final String   CHARACTERISTIC_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb"; // SERVICE_BATTERY
-    public static final String          CHARACTERISTIC_SERIAL = "00002a25-0000-1000-8000-00805f9b34fb"; // SERVICE_INFORMATION
-    public static final String        CHARACTERISTIC_FIRMWARE = "00002a26-0000-1000-8000-00805f9b34fb"; // SERVICE_INFORMATION
-    public static final String        CHARACTERISTIC_HARDWARE = "00002a27-0000-1000-8000-00805f9b34fb"; // SERVICE_INFORMATION
-    public static final String    CHARACTERISTIC_ACCELERATION = "43ba4000-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMS
-    public static final String     CHARACTERISTIC_CALIBRATION = "43ba4002-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMS
-    public static final String          CHARACTERISTIC_STATUS = "43ba4200-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
-    public static final String           CHARACTERISTIC_SPEED = "43ba4202-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
-    public static final String       CHARACTERISTIC_TIMESTAMP = "43ba4203-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
-    public static final String             CHARACTERISTIC_PIN = "43ba4204-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
+    public static final String CHARACTERISTIC_DEVICE_NAME = "00002a00-0000-1000-8000-00805f9b34fb"; // SERVICE_GENERIC
+    public static final String CHARACTERISTIC_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb"; // SERVICE_BATTERY
+    public static final String CHARACTERISTIC_SERIAL = "00002a25-0000-1000-8000-00805f9b34fb"; // SERVICE_INFORMATION
+    public static final String CHARACTERISTIC_FIRMWARE = "00002a26-0000-1000-8000-00805f9b34fb"; // SERVICE_INFORMATION
+    public static final String CHARACTERISTIC_HARDWARE = "00002a27-0000-1000-8000-00805f9b34fb"; // SERVICE_INFORMATION
+    public static final String CHARACTERISTIC_ACCELERATION = "43ba4000-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMS
+    public static final String CHARACTERISTIC_CALIBRATION = "43ba4002-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMS
+    public static final String CHARACTERISTIC_STATUS = "43ba4200-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
+    public static final String CHARACTERISTIC_SPEED = "43ba4202-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
+    public static final String CHARACTERISTIC_TIMESTAMP = "43ba4203-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
+    public static final String CHARACTERISTIC_PIN = "43ba4204-4cf5-46d8-a887-a846d9de712d"; // SERVICE_CONFIG
     public static final String CHARACTERISTIC_CRASH_THRESHOLD = "43ba4302-4cf5-46d8-a887-a846d9de712d"; // SERVICE_DRIVING
-    public static final String    CHARACTERISTIC_CRASH_BUFFER = "43ba4400-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
-    public static final String  CHARACTERISTIC_CRASH_DOWNLOAD = "43ba4401-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
-    public static final String  CHARACTERISTIC_EVENT_DOWNLOAD = "43ba4403-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
-    public static final String       CHARACTERISTIC_ANOMALIES = "43ba4404-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
+    public static final String CHARACTERISTIC_CRASH_BUFFER = "43ba4400-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
+    public static final String CHARACTERISTIC_CRASH_DOWNLOAD = "43ba4401-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
+    public static final String CHARACTERISTIC_EVENT_DOWNLOAD = "43ba4403-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
+    public static final String CHARACTERISTIC_ANOMALIES = "43ba4404-4cf5-46d8-a887-a846d9de712d"; // SERVICE_MEMORY
 
-    public static final String                SERVICE_GENERIC = "00001800-0000-1000-8000-00805f9b34fb";
-    public static final String            SERVICE_INFORMATION = "0000180a-0000-1000-8000-00805f9b34fb";
-    public static final String                SERVICE_BATTERY = "0000180f-0000-1000-8000-00805f9b34fb";
-    public static final String                   SERVICE_MEMS = "43ba1a00-4cf5-46d8-a887-a846d9de712d";
-    public static final String                 SERVICE_CONFIG = "43ba1a02-4cf5-46d8-a887-a846d9de712d";
-    public static final String                SERVICE_DRIVING = "43ba1a03-4cf5-46d8-a887-a846d9de712d";
-    public static final String                 SERVICE_MEMORY = "43ba1a04-4cf5-46d8-a887-a846d9de712d";
+    public static final String SERVICE_GENERIC = "00001800-0000-1000-8000-00805f9b34fb";
+    public static final String SERVICE_INFORMATION = "0000180a-0000-1000-8000-00805f9b34fb";
+    public static final String SERVICE_BATTERY = "0000180f-0000-1000-8000-00805f9b34fb";
+    public static final String SERVICE_MEMS = "43ba1a00-4cf5-46d8-a887-a846d9de712d";
+    public static final String SERVICE_CONFIG = "43ba1a02-4cf5-46d8-a887-a846d9de712d";
+    public static final String SERVICE_DRIVING = "43ba1a03-4cf5-46d8-a887-a846d9de712d";
+    public static final String SERVICE_MEMORY = "43ba1a04-4cf5-46d8-a887-a846d9de712d";
 
-    public final static short BEACON_CODE = (short)0x215;
+    public final static short BEACON_CODE = (short) 0x215;
     public final static int MANUFACTURER_PACKET_SIZE = 23;
+    public static double k_G_TO_MS2 = 0.00980665;
+    public static boolean stop = false;
+
 
     private int manufacturerId;
     private UUID beaconNamespace;
@@ -98,9 +105,20 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
     private int minor;
     private String manufacturerReserved;
     private byte power;
+    private String serial;
 
     private static BluetoothGattServer mGattServer;
+    private static BluetoothDevice connectedDevice;
     public BluetoothGattServerCallback gattCallback = new BluetoothGattServerCallback() {
+
+        @Override
+        public void onDescriptorWriteRequest(BluetoothDevice device, int requestId, BluetoothGattDescriptor descriptor, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
+            super.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value);
+            if (responseNeeded) {
+                mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
+            }
+        }
+
         @Override
         public void onServiceAdded(int status, BluetoothGattService service) {
             Log.d("GATT", "onServiceAdded(status: " + status + ", service: " + service + ")");
@@ -108,10 +126,20 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
             configureGatt(mGattServer, service.getUuid().toString());
         }
 
+
         @Override
         public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
             Log.d("GATT", "onConnectionStateChange(device: " + device + ", status: " + status + ", newState: " + newState + ")");
             super.onConnectionStateChange(device, status, newState);
+            if (status == 0) {
+                connectedDevice = device;
+            }
+
+        }
+
+        @Override
+        public void onNotificationSent(BluetoothDevice device, int status) {
+            super.onNotificationSent(device, status);
         }
 
         @Override
@@ -121,6 +149,12 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
             switch (characteristic.getUuid().toString()) {
                 case CHARACTERISTIC_DEVICE_NAME:
                     mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "SmartTag".getBytes());
+                    break;
+                case CHARACTERISTIC_FIRMWARE:
+                    mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "02.16.00".getBytes());
+                    break;
+                case CHARACTERISTIC_HARDWARE:
+                    mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "v2.16".getBytes());
                     break;
                 case CHARACTERISTIC_PIN:
                     mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, new byte[]{0x01, 0x00});
@@ -141,6 +175,13 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
             Log.d("GATT", "onCharacteristicWriteRequest(device: " + device + ", requestId: " + requestId + ", characteristic: " + characteristic.getUuid() + ", preparedWrite: " + preparedWrite + ", responseNeeded: " + responseNeeded + ", offset: " + offset + ", value: " + Arrays.toString(value) + ")");
             super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
+            switch (characteristic.getUuid().toString()) {
+                case CHARACTERISTIC_CALIBRATION:
+                    if (value[0] == 1) {
+                        calibrateAcceleration();
+                    }
+                    break;
+            }
             if (responseNeeded) {
                 mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
             }
@@ -159,7 +200,9 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         setBeaconNamespace(UUID.fromString("B810736B-11FC-85C3-1762-80DF658F0B31"));
         setMajor(0);
         setMinor(0);
-        setPower((byte)-69);
+        setPower((byte) -69);
+        serial = "";
+
     }
 
     public static void configureGatt(BluetoothGattServer gattServer) {
@@ -189,7 +232,7 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
             }
         }
         if (uuid != null) {
-        //for (String uuid: service_uuids) {
+            //for (String uuid: service_uuids) {
             BluetoothGattService service = GattUtils.createPrimaryService(uuid);
             switch (uuid) {
                 case SERVICE_GENERIC:
@@ -267,6 +310,13 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         this.power = power;
     }
 
+    public String getSerial() {
+        return serial;
+    }
+
+    public void setSerial(String serial) {
+        this.serial = serial;
+    }
 
     @Override
     public AdvertiseData generateAdvertiseData() {
@@ -302,7 +352,7 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         // Parse data
         final long uuidHigh = buffer.getLong();
         final long uuidLow = buffer.getLong();
-        final int major =  ByteTools.toIntFromShortInBytes_BE(new byte[]{buffer.get(), buffer.get()});
+        final int major = ByteTools.toIntFromShortInBytes_BE(new byte[]{buffer.get(), buffer.get()});
         final int minor = ByteTools.toIntFromShortInBytes_BE(new byte[]{buffer.get(), buffer.get()});
         final byte power = buffer.get();
         final B810Beacon b810beacon = new B810Beacon();
@@ -324,6 +374,7 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         dest.writeSerializable(this.beaconNamespace);
         dest.writeInt(this.major);
         dest.writeInt(this.minor);
+        dest.writeString(this.serial);
         dest.writeString(this.manufacturerReserved);
         dest.writeByte(this.power);
     }
@@ -333,9 +384,55 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         this.beaconNamespace = (UUID) in.readSerializable();
         this.major = in.readInt();
         this.minor = in.readInt();
+        this.serial = in.readString();
         this.manufacturerReserved = in.readString();
         this.power = in.readByte();
     }
+
+    public static void sendAcceleration(final int time) {
+        stop = true;
+        BluetoothGattCharacteristic charaDrive = mGattServer.getService(UUID.fromString(SERVICE_CONFIG)).getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS));
+        charaDrive.setValue(MathUtils.getBytes(1));
+        mGattServer.notifyCharacteristicChanged(connectedDevice, charaDrive, false);
+        final byte[] data = new byte[6];
+
+        stop = false;
+        final Handler h = new Handler();
+        final int[] i = {0};
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (stop) {
+                    h.removeCallbacks(this);
+                    sendParking();
+                    return;
+                }
+
+                if (time == 0 || i[0] < time) {
+                    MathUtils.copyBytes(data, 300+ new Random().nextInt(20), 400+new Random().nextInt(20), 30);
+                    final BluetoothGattCharacteristic chara = mGattServer.getService(UUID.fromString(SERVICE_MEMS)).getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION));
+                    chara.setValue(data);
+                    mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
+                    h.postDelayed(this, 1000);
+                    i[0]++;
+                } else {
+                    sendParking();
+                    h.removeCallbacks(this);
+                }
+            }
+        };
+        h.postDelayed(r, 1000);
+    }
+
+
+    public static void sendParking() {
+        stop = true;
+        BluetoothGattCharacteristic chara = mGattServer.getService(UUID.fromString(SERVICE_CONFIG)).getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS));
+        chara.setValue(MathUtils.getBytes(0));
+        mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
+
+    }
+
 
     public static final Creator<B810Beacon> CREATOR = new Creator<B810Beacon>() {
         @Override
@@ -348,4 +445,29 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
             return new B810Beacon[size];
         }
     };
+
+
+    public static void calibrateAcceleration() {
+        stop = false;
+        for (int i = 0; i < 5; i++) {
+            if (stop) {
+                return;
+            }
+            try {
+                sendIdleAcceleration();
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void sendIdleAcceleration() {
+        byte[] data = new byte[6];
+        MathUtils.copyBytes(data, 0, 0, 930);
+        BluetoothGattCharacteristic chara = mGattServer.getService(UUID.fromString(SERVICE_MEMS)).getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION));
+        chara.setValue(data);
+        mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
+        Log.i("GATT: ", "send acceleration =" + Arrays.toString(data));
+    }
 }
