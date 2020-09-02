@@ -51,8 +51,11 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.ScanRecord;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.support.v4.app.INotificationSideChannel;
+import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -64,6 +67,7 @@ import net.alea.beaconsimulator.util.MathUtils;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.TreeMap;
 import java.util.UUID;
 
 public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
@@ -160,7 +164,7 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
                     mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, new byte[]{0x01, 0x00});
                     break;
                 case CHARACTERISTIC_SERIAL:
-                    mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "10013C3F".getBytes());
+                    mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, getSerial().getBytes());
                     break;
                 case CHARACTERISTIC_CRASH_THRESHOLD:
                     mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, new byte[]{
@@ -181,11 +185,40 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
                         calibrateAcceleration();
                     }
                     break;
+                case CHARACTERISTIC_CRASH_DOWNLOAD:
+                    if (MathUtils.getInt(value) == 0) {
+                        sendCrashBuffer();
+                    } else {
+                        if (MathUtils.getInt(value) == 0xFFFF) {
+                            Log.i("GATT", "process completed: ");
+
+                            break;
+                        } else if (MathUtils.getInt(value) == 0xFFFE) {
+                            Log.i("GATT", "process restarted: ");
+
+                            sendCrash();
+                            break;
+                        } else {
+                            Log.i("GATT", "lost index: "+MathUtils.getInt(value));
+                            byte[] data = new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                            if (MathUtils.getInt(value) > 599) {
+                                byte[] time = MathUtils.getBytes(System.currentTimeMillis());
+                                System.arraycopy(time, 0, value, 2, 4);
+                            }
+                            System.arraycopy(value, 0, value, 0, 2);
+                            BluetoothGattCharacteristic charaDrive = mGattServer.getService(UUID.fromString(SERVICE_MEMORY))
+                                    .getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER));
+                            charaDrive.setValue(data);
+                            mGattServer.notifyCharacteristicChanged(connectedDevice, charaDrive, false);
+                        }
+                    }
+                    break;
             }
             if (responseNeeded) {
                 mGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
             }
         }
+
 
         @Override
         public void onExecuteWrite(BluetoothDevice device, int requestId, boolean execute) {
@@ -409,7 +442,7 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
                 }
 
                 if (time == 0 || i[0] < time) {
-                    MathUtils.copyBytes(data, 300+ new Random().nextInt(20), 400+new Random().nextInt(20), 30);
+                    MathUtils.copyBytes(data, 300 + new Random().nextInt(20), 400 + new Random().nextInt(20), 30);
                     final BluetoothGattCharacteristic chara = mGattServer.getService(UUID.fromString(SERVICE_MEMS)).getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION));
                     chara.setValue(data);
                     mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
@@ -431,6 +464,13 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         chara.setValue(MathUtils.getBytes(0));
         mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
 
+    }
+
+    public static void sendCrash() {
+        stop = true;
+        BluetoothGattCharacteristic chara = mGattServer.getService(UUID.fromString(SERVICE_CONFIG)).getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS));
+        chara.setValue(MathUtils.getBytes(6));
+        mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
     }
 
 
@@ -469,5 +509,72 @@ public class B810Beacon implements AdvertiseDataGenerator, Parcelable {
         chara.setValue(data);
         mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
         Log.i("GATT: ", "send acceleration =" + Arrays.toString(data));
+    }
+
+    public static void sendCrashBuffer() {
+        final int[] index = {1};
+        final Handler h = new Handler(Looper.getMainLooper());
+        Log.i("GATT", "crash buffer start");
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                byte[] value = new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                if (index[0] <= 601) {
+                    if (index[0] > 599) {
+                        byte[] time = MathUtils.getBytes(System.currentTimeMillis());
+                        System.arraycopy(time, 0, value, 2, 4);
+                    }
+                    System.arraycopy(MathUtils.getBytes(index[0]), 0, value, 0, 2);
+
+                    BluetoothGattCharacteristic charaDrive = mGattServer.getService(UUID.fromString(SERVICE_MEMORY))
+                            .getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER));
+                    charaDrive.setValue(value);
+                    mGattServer.notifyCharacteristicChanged(connectedDevice, charaDrive, false);
+                    index[0]++;
+                    h.postDelayed(this, 100);
+                    Log.i("GATT", "crash buffer index: " + index[0]);
+                } else {
+                    BluetoothGattCharacteristic chara = mGattServer.getService(UUID.fromString(SERVICE_CONFIG)).getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS));
+                    chara.setValue(MathUtils.getBytes(26));
+                    mGattServer.notifyCharacteristicChanged(connectedDevice, chara, false);
+                    h.removeCallbacks(this);
+                    Log.i("GATT", "crash buffer end: " + index[0]);
+                }
+            }
+        };
+        h.postDelayed(r, 100);
+    }
+
+
+    public static void addBuffer(byte[] buffer, TreeMap<Integer, byte[]> buffers) {
+        int indexInt = MathUtils.getInt(buffer);
+        buffers.put(indexInt, buffer);
+        if (buffers.size() == 1) {
+            Log.i("BLE", "Starting crash download of type: ");
+        }
+        if (buffers.size() == 601) {
+//            crashBuffer = "";
+            byte[] buf601 = buffers.get(601);
+            if (buf601 != null) {
+//                timestamp = MathUtils.getLong(buf601, 2);
+            }
+            byte[] allBytes = new byte[0];
+            for (byte[] b : buffers.values()) {
+//                crashBuffer += Base64.encodeToString(b, Base64.NO_WRAP);
+                allBytes = concatByteArrays(allBytes, b);
+            }
+            BluetoothGattCharacteristic charaDrive = mGattServer.getService(UUID.fromString(SERVICE_MEMORY))
+                    .getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER));
+            charaDrive.setValue(allBytes);
+            mGattServer.notifyCharacteristicChanged(connectedDevice, charaDrive, false);
+//            crashBuffer = Base64.encodeToString(allBytes, Base64.NO_WRAP);
+        }
+    }
+
+    private static byte[] concatByteArrays(byte[] first, byte[] second) {
+        byte[] destination = new byte[first.length + second.length];
+        System.arraycopy(first, 0, destination, 0, first.length);
+        System.arraycopy(second, 0, destination, first.length, second.length);
+        return destination;
     }
 }

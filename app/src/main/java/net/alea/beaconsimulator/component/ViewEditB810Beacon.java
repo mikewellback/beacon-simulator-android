@@ -160,6 +160,12 @@ public class ViewEditB810Beacon extends FrameLayout implements BeaconModelEditor
                 B810Beacon.sendParking();
             }
         });
+        view.findViewById(R.id.crash).setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                B810Beacon.sendCrash();
+            }
+        });
     }
 
     @Override

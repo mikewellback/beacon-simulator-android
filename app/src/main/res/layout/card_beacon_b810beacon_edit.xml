@@ -242,6 +242,28 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
                 android:layout_weight="1"
                 android:text="park" />
         </LinearLayout>
+        <LinearLayout
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/crash"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:text="Crash" />
+
+        </LinearLayout>
+
+        <ProgressBar
+            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:indeterminate="false"
+            android:max="601"
+            android:progress="0" />
     </LinearLayout>
 
 </android.support.v7.widget.CardView>
