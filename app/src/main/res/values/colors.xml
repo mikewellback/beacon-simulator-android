@@ -48,4 +48,6 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
     <color name="colorPrimaryClear">#B0BEC5</color>
     <color name="selected_overlay">#80607D8B</color>
     <color name="colorBackground">#fff5f5f5</color>
+    <color name="green">#00FF0A</color>
+    <color name="red">#FF0000</color>
 </resources>

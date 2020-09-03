@@ -48,7 +48,6 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattServer;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
@@ -457,8 +456,8 @@ public class BeaconSimulatorService extends Service {
                     if (mGattServer == null) {
                         BluetoothManager btManager = ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE));
                         if (btManager != null) {
-                            mGattServer = btManager.openGattServer(BeaconSimulatorService.this, model.getB810beacon().gattCallback);
-                            B810Beacon.configureGatt(mGattServer);
+                            mGattServer = btManager.openGattServer(BeaconSimulatorService.this, model.getB810beacon().getGattCallback());
+                            B810Beacon.Companion.configureGatt(mGattServer);
                         }
                     }
                 }

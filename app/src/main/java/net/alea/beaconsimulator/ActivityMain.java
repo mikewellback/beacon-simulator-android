@@ -59,6 +59,8 @@ import android.support.v4.view.ViewPager;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
 
+import net.alea.beaconsimulator.bluetooth.model.BeaconType;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,10 +146,11 @@ public class ActivityMain extends ActivityDrawer implements  FragmentScanner.OnS
                         }
                         break;
                     case ViewPagerAdapter.PAGE_INDEX_SIMULATOR:
-                        final FragmentSimulator fragmentSimulator = mViewPagerAdapter.getFragmentSimulator();
-                        if (fragmentSimulator != null) {
-                            fragmentSimulator.actionCreateBeacon();
-                        }
+//                        final FragmentSimulator fragmentSimulator = mViewPagerAdapter.getFragmentSimulator();
+//                        if (fragmentSimulator != null) {
+//                            fragmentSimulator.actionCreateBeacon();
+//                        }
+                        ActivityBeaconEdit.createNewBeacon(ActivityMain.this, BeaconType.b810beacon);
                         break;
                     default:
                         throw new IndexOutOfBoundsException(String.format("Cannot have more than %s items", ViewPagerAdapter.PAGE_COUNT));

@@ -220,7 +220,7 @@ public class FragmentDetailedScan extends Fragment {
                 fillFlagsCard((Flags)structure, cardContainer);
             }
             else if (structure instanceof ADManufacturerSpecific) {
-                B810Beacon b810Beacon = B810Beacon.parseRecord(mScanResult.getScanRecord());
+                B810Beacon b810Beacon = B810Beacon.Companion.parseRecord(mScanResult.getScanRecord());
                 AltBeacon altBeacon = AltBeacon.parseRecord(mScanResult.getScanRecord());
                 IBeacon iBeacon = new IBeaconParser().parseScanRecord(mScanResult.getScanRecord());
                 if (iBeacon != null) {

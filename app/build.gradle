@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 
 def getBuildNumber = { ->
@@ -84,4 +85,8 @@ dependencies {
     implementation 'org.greenrobot:eventbus:3.0.0'
     implementation project(':modules:nv-bluetooth')
     implementation project(':modules:localization-activity')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}
+repositories {
+    mavenCentral()
 }

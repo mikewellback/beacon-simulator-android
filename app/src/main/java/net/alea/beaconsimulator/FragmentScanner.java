@@ -434,7 +434,7 @@ public class FragmentScanner extends Fragment {
         }
 
         private int getBeaconTypeImage(ScanResult scanResult) {
-            if (B810Beacon.parseRecord(scanResult.getScanRecord()) != null) {
+            if (B810Beacon.Companion.parseRecord(scanResult.getScanRecord()) != null) {
                 return BeaconType.b810beacon.getImageResource();
             }
             if (AltBeacon.parseRecord(scanResult.getScanRecord()) != null) {
