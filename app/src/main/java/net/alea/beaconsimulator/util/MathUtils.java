@@ -2,6 +2,7 @@ package net.alea.beaconsimulator.util;
 
 import android.util.Log;
 
+import java.nio.ByteBuffer;
 import java.security.acl.LastOwnerException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,9 +35,14 @@ public class MathUtils {
         return value;
     }
 
+
+    public static byte [] getBytes (float value) {
+        return ByteBuffer.allocate(4).putFloat(value).array();
+    }
+
     public static void copyBytes(byte[] from, int... values) {
         List<byte[]> data = new ArrayList<>();
-        for (int value : values) {
+        for (int     value : values) {
             data.add(MathUtils.getBytes(value));
         }
         int dataIndex = 0;

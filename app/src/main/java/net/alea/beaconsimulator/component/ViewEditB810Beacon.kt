@@ -41,45 +41,170 @@
 package net.alea.beaconsimulator.component
 
 import android.content.Context
-import android.support.design.widget.TextInputEditText
-import android.support.design.widget.TextInputLayout
+import android.content.SharedPreferences
+import android.os.Handler
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
-import android.view.View
-import android.widget.*
+import android.widget.FrameLayout
+import android.widget.ProgressBar
+import android.widget.Toast
+import kotlinx.android.synthetic.main.card_beacon_b810beacon_edit.view.*
 import net.alea.beaconsimulator.R
 import net.alea.beaconsimulator.bluetooth.model.B810Beacon
 import net.alea.beaconsimulator.bluetooth.model.B810Beacon.Companion.sendAcceleration
 import net.alea.beaconsimulator.bluetooth.model.B810Beacon.Companion.sendCrash
 import net.alea.beaconsimulator.bluetooth.model.B810Beacon.Companion.sendParking
 import net.alea.beaconsimulator.bluetooth.model.BeaconModel
+import net.alea.beaconsimulator.util.onProgressChange
 import java.util.*
+import kotlin.math.max
+import kotlin.math.min
 
 class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEditor {
-    private val mUuidLayout: TextInputLayout
-    private val mMajorLayout: TextInputLayout
-    private val mMinorLayout: TextInputLayout
-    private val mSerialLayout: TextInputLayout
-    private val mPowerLayout: TextInputLayout
-    private val mManufacturerIdLayout: TextInputLayout
-    private val mUuidValue: TextInputEditText
-    private val mMajorValue: TextInputEditText
-    private val mMinorValue: TextInputEditText
-    private val mSerialValue: TextInputEditText
-    private val mPowerValue: TextInputEditText
-    private val mManufacturerIdValue: TextInputEditText
-    private val mTime: TextInputEditText
-    private val mTxPowerInfo: TextView
-    private val mUuidButton: Button
+    private val pref: SharedPreferences = context.getSharedPreferences("crash_pref", Context.MODE_PRIVATE)
+    private val edit: SharedPreferences.Editor = pref.edit()
+
+
+    init {
+        val inflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        val view = inflater.inflate(R.layout.card_beacon_b810beacon_edit, this)
+        cardb810beacon_textinput_uuid.addTextChangedListener(object : SimplifiedTextWatcher() {
+            override fun afterTextChanged(s: Editable) {
+                checkUuidValue()
+            }
+        })
+        cardb810beacon_textinput_major.addTextChangedListener(object : SimplifiedTextWatcher() {
+            override fun afterTextChanged(s: Editable) {
+                calculateSerial()
+            }
+        })
+        cardb810beacon_textinput_minor.addTextChangedListener(object : SimplifiedTextWatcher() {
+            override fun afterTextChanged(s: Editable) {
+                calculateSerial()
+            }
+        })
+        cardb810beacon_textinput_serial.addTextChangedListener(object : SimplifiedTextWatcher() {
+            override fun afterTextChanged(s: Editable) {
+                checkSerialValue()
+            }
+        })
+        cardb810beacon_textinput_power.addTextChangedListener(object : SimplifiedTextWatcher() {
+            override fun afterTextChanged(s: Editable) {
+                checkPowerValue()
+            }
+        })
+        cardb810beacon_textinput_manufacturerid.addTextChangedListener(object : SimplifiedTextWatcher() {
+            override fun afterTextChanged(s: Editable) {
+                checkManufacturerIdValue()
+            }
+        })
+
+
+        cardb810beacon_button_resetuuid.setOnClickListener { cardb810beacon_textinput_uuid.setText(UUID.fromString("B810736B-11FC-85C3-1762-80DF658F0B31").toString()) }
+        start_acceleration.setOnClickListener {
+            var time = 0
+            if (timeAccelerationEt.text.toString() != "") {
+                time = timeAccelerationEt.text.toString().toInt()
+            }
+            sendAcceleration(time)
+        }
+        stop.setOnClickListener { sendParking() }
+        crash.setOnClickListener {
+            sendCrash()
+        }
+
+        addCrash.setOnClickListener {
+            val count = min(pref.getInt("crashCountTxt", 0) + 1, 8)
+            edit.putInt("crashCountTxt", count).commit()
+            crashCountTxt.text = "$count"
+        }
+
+        calibManual.setOnCheckedChangeListener { _, checked ->
+            B810Beacon.manualCalib = checked
+            enableManualCalib(if (checked) VISIBLE else GONE)
+        }
+
+        calib_seek.onProgressChange {
+            B810Beacon.calib_x = it
+            calib_value.text = "$it"
+        }
+        calib_seekY.onProgressChange {
+            B810Beacon.calib_y = it
+            calib_valueY.text = "$it"
+        }
+        calib_seekZ.onProgressChange {
+            B810Beacon.calib_z = it
+            calib_valueZ.text = "$it"
+        }
+        removeCrash.setOnClickListener {
+            val count = max(pref.getInt("crashCountTxt", 0) - 1, 0)
+            edit.putInt("crashCountTxt", count).commit()
+            crashCountTxt.text = "$count"
+        }
+
+        crashCountTxt.text = "${pref.getInt("crashCountTxt", 0)}"
+
+        B810Beacon.crashProgressCallback = {
+            findViewById<ProgressBar>(R.id.progressCrash).progress = it
+            if (it > 600) {
+                val count = max(pref.getInt("crashCountTxt", 0) - 1, 0)
+                edit.putInt("crashCountTxt", count).commit()
+                crashCountTxt.text = "$count"
+                Toast.makeText(context, "sending crash completed", Toast.LENGTH_LONG).show()
+                if (pref.getInt("crashCountTxt", 0) > 0) {
+                    Handler().postDelayed({
+                        sendCrash()
+                    }, 1000)
+                }
+            }
+
+        }
+
+        if (B810Beacon.connecttionStatus) {
+            connected_indicator.setBackgroundResource(R.drawable.connected_shape)
+            if (B810Beacon.calibrateStatus) {
+                enableButtons(true)
+            }
+        } else {
+            enableButtons(false)
+            connected_indicator.setBackgroundResource(R.drawable.diconnected_shape)
+        }
+        B810Beacon.connectedCallback = { connected ->
+            post {
+                if (connected) {
+                    connected_indicator.setBackgroundResource(R.drawable.connected_shape)
+                } else {
+                    enableButtons(false)
+                    connected_indicator.setBackgroundResource(R.drawable.diconnected_shape)
+                }
+            }
+
+        }
+        cornering.setOnClickListener {
+            B810Beacon.sendCornering()
+        }
+        braking.setOnClickListener {
+            B810Beacon.sendBraking()
+        }
+
+        B810Beacon.calibrateCallback = {
+            enableButtons(true)
+        }
+
+        stopCalibrBtn.setOnClickListener {
+            B810Beacon.stopCalib = true
+        }
+    }
+
     override fun loadModelFrom(model: BeaconModel) {
         val b810beacon = model.b810beacon ?: return
-        mUuidValue.setText(b810beacon.beaconNamespace.toString())
-        mMajorValue.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMajor()))
-        mMinorValue.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMinor()))
+        cardb810beacon_textinput_uuid.setText(b810beacon.beaconNamespace.toString())
+        cardb810beacon_textinput_major.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMajor()))
+        cardb810beacon_textinput_minor.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMinor()))
         calculateSerial()
-        mPowerValue.setText(String.format(Locale.ENGLISH, "%d", b810beacon.power))
-        mManufacturerIdValue.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getManufacturerId()))
+        cardb810beacon_textinput_power.setText(String.format(Locale.ENGLISH, "%d", b810beacon.power))
+        cardb810beacon_textinput_manufacturerid.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getManufacturerId()))
     }
 
     override fun saveModelTo(model: BeaconModel): Boolean {
@@ -87,35 +212,35 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             return false
         }
         val b810beacon = B810Beacon()
-        b810beacon.beaconNamespace = UUID.fromString(mUuidValue.text.toString())
-        b810beacon.setMajor(mMajorValue.text.toString().toInt())
-        b810beacon.setMinor(mMinorValue.text.toString().toInt())
-        b810beacon.serial = mSerialValue.text.toString()
-        b810beacon.power = mPowerValue.text.toString().toByte()
-        b810beacon.setManufacturerId(mManufacturerIdValue.text.toString().toInt())
+        b810beacon.beaconNamespace = UUID.fromString(cardb810beacon_textinput_uuid.text.toString())
+        b810beacon.setMajor(cardb810beacon_textinput_major.text.toString().toInt())
+        b810beacon.setMinor(cardb810beacon_textinput_minor.text.toString().toInt())
+        b810beacon.serial = cardb810beacon_textinput_serial.text.toString()
+        b810beacon.power = cardb810beacon_textinput_power.text.toString().toByte()
+        b810beacon.setManufacturerId(cardb810beacon_textinput_manufacturerid.text.toString().toInt())
         model.setB810Beacon(b810beacon)
         return true
     }
 
     override fun setEditMode(editMode: Boolean) {
-        mUuidValue.isEnabled = editMode
-        mMajorValue.isEnabled = editMode
-        mMinorValue.isEnabled = editMode
-        mSerialValue.isEnabled = editMode
-        mPowerValue.isEnabled = editMode
-        mManufacturerIdValue.isEnabled = editMode
-        mUuidButton.visibility = if (editMode) View.VISIBLE else View.GONE
-        mTxPowerInfo.visibility = if (editMode) View.VISIBLE else View.GONE
+        cardb810beacon_textinput_uuid.isEnabled = editMode
+        cardb810beacon_textinput_major.isEnabled = editMode
+        cardb810beacon_textinput_minor.isEnabled = editMode
+        cardb810beacon_textinput_serial.isEnabled = editMode
+        cardb810beacon_textinput_power.isEnabled = editMode
+        cardb810beacon_textinput_manufacturerid.isEnabled = editMode
+        cardb810beacon_button_resetuuid.visibility = if (editMode) VISIBLE else GONE
+        cardb810beacon_textview_power.visibility = if (editMode) VISIBLE else GONE
     }
 
     private fun checkUuidValue(): Boolean {
         try {
-            val uuid = mUuidValue.text.toString()
+            val uuid = cardb810beacon_textinput_uuid.text.toString()
             require(uuid.length >= 36)
             UUID.fromString(uuid)
-            mUuidLayout.error = null
+            cardb810beacon_textinputlayout_uuid.error = null
         } catch (e: IllegalArgumentException) {
-            mUuidLayout.error = resources.getString(R.string.edit_error_uuid)
+            cardb810beacon_textinputlayout_uuid.error = resources.getString(R.string.edit_error_uuid)
             return false
         }
         return true
@@ -124,7 +249,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
     private fun checkPowerValue(): Boolean {
         var isValid = false
         try {
-            val power = mPowerValue.text.toString().toInt()
+            val power = cardb810beacon_textinput_power.text.toString().toInt()
             if (power >= -128 && power <= 127) {
                 isValid = true
             }
@@ -132,9 +257,9 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             // not valid, isValid already false
         }
         if (isValid) {
-            mPowerLayout.error = null
+            cardb810beacon_textinputlayout_power.error = null
         } else {
-            mPowerLayout.error = resources.getString(R.string.edit_error_signed_byte)
+            cardb810beacon_textinputlayout_power.error = resources.getString(R.string.edit_error_signed_byte)
         }
         return isValid
     }
@@ -142,7 +267,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
     private fun checkMajorValue(): Boolean {
         var isValid = false
         try {
-            val major = mMajorValue.text.toString().toInt()
+            val major = cardb810beacon_textinput_major.text.toString().toInt()
             if (major >= 0 && major <= 65535) {
                 isValid = true
             }
@@ -150,9 +275,9 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             // not valid, isValid already false
         }
         if (isValid) {
-            mMajorLayout.error = null
+            cardb810beacon_textinputlayout_major.error = null
         } else {
-            mMajorLayout.error = resources.getString(R.string.edit_error_unsigned_short)
+            cardb810beacon_textinputlayout_major.error = resources.getString(R.string.edit_error_unsigned_short)
         }
         return isValid
     }
@@ -160,7 +285,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
     private fun checkMinorValue(): Boolean {
         var isValid = false
         try {
-            val minor = mMinorValue.text.toString().toInt()
+            val minor = cardb810beacon_textinput_minor.text.toString().toInt()
             if (minor >= 0 && minor <= 65535) {
                 isValid = true
             }
@@ -168,44 +293,47 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             // not valid, isValid already false
         }
         if (isValid) {
-            mMinorLayout.error = null
+            cardb810beacon_textinputlayout_minor.error = null
         } else {
-            mMinorLayout.error = resources.getString(R.string.edit_error_unsigned_short)
+            cardb810beacon_textinputlayout_minor.error = resources.getString(R.string.edit_error_unsigned_short)
         }
         return isValid
     }
 
     private fun checkSerialValue() {
         var isValid = false
-        if (mSerialValue.text.length < 8) {
-            mSerialValue.error = null
-            return
-        } else if (mSerialValue.text.length > 8) {
-            mSerialValue.error = resources.getString(R.string.edit_error_8_hex_characters)
-            return
-        }
-        var serialMajor = 0
-        var serialMinor = 0
-        try {
-            serialMajor = mSerialValue.text.toString().substring(1, 4).toInt(16)
-            serialMinor = mSerialValue.text.toString().substring(4, 8).toInt(16)
-            if (serialMajor >= 0 && serialMajor <= 65535 && serialMinor >= 0 && serialMinor <= 65535) {
-                isValid = true
+        cardb810beacon_textinput_serial.text?.let {
+            if (it.length < 8) {
+                cardb810beacon_textinput_serial.error = null
+                return
+            } else if (it.length > 8) {
+                cardb810beacon_textinput_serial.error = resources.getString(R.string.edit_error_8_hex_characters)
+                return
             }
-        } catch (e: NumberFormatException) {
-            // not valid, isValid already false
-        }
-        if (isValid) {
-            if (serialMajor.toString() != mMajorValue.text.toString()) {
-                mMajorValue.setText(serialMajor.toString())
+            var serialMajor = 0
+            var serialMinor = 0
+            try {
+                serialMajor = it.toString().substring(1, 4).toInt(16)
+                serialMinor = it.toString().substring(4, 8).toInt(16)
+                if (serialMajor >= 0 && serialMajor <= 65535 && serialMinor >= 0 && serialMinor <= 65535) {
+                    isValid = true
+                }
+            } catch (e: NumberFormatException) {
+                // not valid, isValid already false
             }
-            if (serialMinor.toString() != mMinorValue.text.toString()) {
-                mMinorValue.setText(serialMinor.toString())
+            if (isValid) {
+                if (serialMajor.toString() != cardb810beacon_textinput_major.text.toString()) {
+                    cardb810beacon_textinput_major.setText(serialMajor.toString())
+                }
+                if (serialMinor.toString() != cardb810beacon_textinput_minor.text.toString()) {
+                    cardb810beacon_textinput_minor.setText(serialMinor.toString())
+                }
+                cardb810beacon_textinput_serial.error = null
+            } else {
+                cardb810beacon_textinput_serial.error = resources.getString(R.string.edit_error_8_hex_characters)
             }
-            mSerialValue.error = null
-        } else {
-            mSerialValue.error = resources.getString(R.string.edit_error_8_hex_characters)
         }
+
     }
 
     private fun calculateSerial() {
@@ -214,8 +342,8 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             var serialMajor = 0
             var serialMinor = 0
             try {
-                serialMajor = mMajorValue.text.toString().toInt()
-                serialMinor = mMinorValue.text.toString().toInt()
+                serialMajor = cardb810beacon_textinput_major.text.toString().toInt()
+                serialMinor = cardb810beacon_textinput_minor.text.toString().toInt()
                 if (serialMajor >= 0 && serialMajor <= 65535 && serialMinor >= 0 && serialMinor <= 65535) {
                     isValid = true
                 }
@@ -226,8 +354,8 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
                 val major = Integer.toString(serialMajor, 16)
                 val minor = Integer.toString(serialMinor, 16)
                 val serial = ("1" + "000$major".substring(major.length) + "0000$minor".substring(minor.length)).toUpperCase()
-                if (serial != mSerialValue.text.toString()) {
-                    mSerialValue.setText(serial)
+                if (serial != cardb810beacon_textinput_serial.text.toString()) {
+                    cardb810beacon_textinput_serial.setText(serial)
                 }
             }
         }
@@ -236,7 +364,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
     private fun checkManufacturerIdValue(): Boolean {
         var isValid = false
         try {
-            val manufacturerId = mManufacturerIdValue.text.toString().toInt()
+            val manufacturerId = cardb810beacon_textinput_manufacturerid.text.toString().toInt()
             if (manufacturerId >= 0 && manufacturerId <= 65535) {
                 isValid = true
             }
@@ -244,9 +372,9 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             // not valid, isValid already false
         }
         if (isValid) {
-            mManufacturerIdLayout.error = null
+            cardb810beacon_textinputlayout_manufacturerid.error = null
         } else {
-            mManufacturerIdLayout.error = resources.getString(R.string.edit_error_unsigned_short)
+            cardb810beacon_textinputlayout_manufacturerid.error = resources.getString(R.string.edit_error_unsigned_short)
         }
         return isValid
     }
@@ -268,98 +396,23 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
         private const val SIZE_HEXA_RESERVED_VALUE = 2
     }
 
-    init {
-        val inflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        val view = inflater.inflate(R.layout.card_beacon_b810beacon_edit, this)
-        mTxPowerInfo = view.findViewById<View>(R.id.cardb810beacon_textview_power) as TextView
-        mUuidLayout = view.findViewById<View>(R.id.cardb810beacon_textinputlayout_uuid) as TextInputLayout
-        mMajorLayout = view.findViewById<View>(R.id.cardb810beacon_textinputlayout_major) as TextInputLayout
-        mMinorLayout = view.findViewById<View>(R.id.cardb810beacon_textinputlayout_minor) as TextInputLayout
-        mSerialLayout = view.findViewById<View>(R.id.cardb810beacon_textinputlayout_serial) as TextInputLayout
-        mPowerLayout = view.findViewById<View>(R.id.cardb810beacon_textinputlayout_power) as TextInputLayout
-        mManufacturerIdLayout = view.findViewById<View>(R.id.cardb810beacon_textinputlayout_manufacturerid) as TextInputLayout
-        mUuidValue = view.findViewById<View>(R.id.cardb810beacon_textinput_uuid) as TextInputEditText
-        mUuidValue.addTextChangedListener(object : SimplifiedTextWatcher() {
-            override fun afterTextChanged(s: Editable) {
-                checkUuidValue()
-            }
-        })
-        mMajorValue = view.findViewById<View>(R.id.cardb810beacon_textinput_major) as TextInputEditText
-        mMajorValue.addTextChangedListener(object : SimplifiedTextWatcher() {
-            override fun afterTextChanged(s: Editable) {
-                calculateSerial()
-            }
-        })
-        mMinorValue = view.findViewById<View>(R.id.cardb810beacon_textinput_minor) as TextInputEditText
-        mMinorValue.addTextChangedListener(object : SimplifiedTextWatcher() {
-            override fun afterTextChanged(s: Editable) {
-                calculateSerial()
-            }
-        })
-        mSerialValue = view.findViewById<View>(R.id.cardb810beacon_textinput_serial) as TextInputEditText
-        mSerialValue.addTextChangedListener(object : SimplifiedTextWatcher() {
-            override fun afterTextChanged(s: Editable) {
-                checkSerialValue()
-            }
-        })
-        mPowerValue = view.findViewById<View>(R.id.cardb810beacon_textinput_power) as TextInputEditText
-        mPowerValue.addTextChangedListener(object : SimplifiedTextWatcher() {
-            override fun afterTextChanged(s: Editable) {
-                checkPowerValue()
-            }
-        })
-        mManufacturerIdValue = view.findViewById<View>(R.id.cardb810beacon_textinput_manufacturerid) as TextInputEditText
-        mManufacturerIdValue.addTextChangedListener(object : SimplifiedTextWatcher() {
-            override fun afterTextChanged(s: Editable) {
-                checkManufacturerIdValue()
-            }
-        })
-        mUuidButton = view.findViewById<View>(R.id.cardb810beacon_button_resetuuid) as Button
-        mUuidButton.setOnClickListener { mUuidValue.setText(UUID.fromString("B810736B-11FC-85C3-1762-80DF658F0B31").toString()) }
-        mTime = view.findViewById(R.id.timeAccelerationEt)
-        view.findViewById<View>(R.id.start_acceleration).setOnClickListener {
-            var time = 0
-            if (mTime.text.toString() != null && mTime.text.toString() != "") {
-                time = mTime.text.toString().toInt()
-            }
-            sendAcceleration(time)
-        }
-        view.findViewById<View>(R.id.stop).setOnClickListener { sendParking() }
-        view.findViewById<View>(R.id.crash).setOnClickListener {
-//            view.findViewById<View>(R.id.crash).isEnabled = false
-            sendCrash()
-        }
 
-        B810Beacon.crashProgressCallback = {
-            view.findViewById<ProgressBar>(R.id.progressCrash).progress = it
-            if (it > 600) {
-//                view.findViewById<View>(R.id.crash).isEnabled = true
-                Toast.makeText(context, "sending crash completed", Toast.LENGTH_LONG).show()
-            }
+    fun enableButtons(enable: Boolean) {
+        post {
+//            startBtn.isEnabled = enable
+//            stop.isEnabled = enable
+//            stop.isEnabled = enable
+//            cornering.isEnabled = enable
+//            braking.isEnabled = enable
+        }
+    }
 
-        }
-        val indicator = view.findViewById<View>(R.id.connected_indicator)
-        if (B810Beacon.connecttionStatus) {
-            indicator.setBackgroundResource(R.drawable.connected_shape)
-        } else {
-            indicator.setBackgroundResource(R.drawable.diconnected_shape)
-        }
-        B810Beacon.connectedCallback = { connected ->
-            view.post {
-                if (connected) {
-                    indicator.setBackgroundResource(R.drawable.connected_shape)
-                } else {
-                    indicator.setBackgroundResource(R.drawable.diconnected_shape)
-                }
-            }
-
-        }
-        view.findViewById<Button>(R.id.cornering).setOnClickListener {
-            B810Beacon.sendCornering()
-        }
-        view.findViewById<Button>(R.id.braking).setOnClickListener {
-            B810Beacon.sendBraking()
-        }
-
+    fun enableManualCalib(visibility: Int) {
+        calib_seek.visibility = visibility
+        calib_seekY.visibility = visibility
+        calib_seekZ.visibility = visibility
+        calib_value.visibility = visibility
+        calib_valueY.visibility = visibility
+        calib_valueZ.visibility = visibility
     }
 }

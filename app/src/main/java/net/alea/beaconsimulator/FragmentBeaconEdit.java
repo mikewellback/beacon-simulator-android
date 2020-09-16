@@ -154,6 +154,7 @@ public class FragmentBeaconEdit extends Fragment {
                 beaconModelView = new ViewEditAltBeacon(getContext());
                 break;
             case b810beacon:
+                if(getContext()!=null)
                 beaconModelView = new ViewEditB810Beacon(getContext());
                 break;
             case raw:
