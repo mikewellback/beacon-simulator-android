@@ -42,9 +42,14 @@ package net.alea.beaconsimulator.component
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Handler
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.LayoutInflater
 import android.widget.FrameLayout
 import android.widget.ProgressBar
@@ -101,6 +106,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
         })
 
 
+        firmwareVersion_texxtinput.setText("02.16.00")
         cardb810beacon_button_resetuuid.setOnClickListener { cardb810beacon_textinput_uuid.setText(UUID.fromString("B810736B-11FC-85C3-1762-80DF658F0B31").toString()) }
         start_acceleration.setOnClickListener {
             var time = 0
@@ -195,13 +201,41 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
         stopCalibrBtn.setOnClickListener {
             B810Beacon.stopCalib = true
         }
+
+
+//        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+//        val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+//
+//
+//        // Create a listener
+//
+//        // Create a listener
+//        val gyroscopeSensorListener = object : SensorEventListener {
+//            override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+//            }
+//
+//            override fun onSensorChanged(p0: SensorEvent?) {
+////                Log.i("TAG","gyros: "+p0!!.accuracy)
+//                Log.i("TAG","gyros: "+p0!!.values.get(0))
+//
+//
+//            }
+//
+//        }
+
+//        sensorManager.registerListener(gyroscopeSensorListener,
+//                sensor, 1000);
+
     }
+
+
 
     override fun loadModelFrom(model: BeaconModel) {
         val b810beacon = model.b810beacon ?: return
         cardb810beacon_textinput_uuid.setText(b810beacon.beaconNamespace.toString())
         cardb810beacon_textinput_major.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMajor()))
         cardb810beacon_textinput_minor.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMinor()))
+        firmwareVersion_texxtinput.setText(b810beacon.firmwareVersion)
         calculateSerial()
         cardb810beacon_textinput_power.setText(String.format(Locale.ENGLISH, "%d", b810beacon.power))
         cardb810beacon_textinput_manufacturerid.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getManufacturerId()))
@@ -212,6 +246,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             return false
         }
         val b810beacon = B810Beacon()
+        b810beacon.firmwareVersion = firmwareVersion_texxtinput.text.toString()
         b810beacon.beaconNamespace = UUID.fromString(cardb810beacon_textinput_uuid.text.toString())
         b810beacon.setMajor(cardb810beacon_textinput_major.text.toString().toInt())
         b810beacon.setMinor(cardb810beacon_textinput_minor.text.toString().toInt())
@@ -226,6 +261,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
         cardb810beacon_textinput_uuid.isEnabled = editMode
         cardb810beacon_textinput_major.isEnabled = editMode
         cardb810beacon_textinput_minor.isEnabled = editMode
+        firmwareVersion_texxtinput.isEnabled = editMode
         cardb810beacon_textinput_serial.isEnabled = editMode
         cardb810beacon_textinput_power.isEnabled = editMode
         cardb810beacon_textinput_manufacturerid.isEnabled = editMode

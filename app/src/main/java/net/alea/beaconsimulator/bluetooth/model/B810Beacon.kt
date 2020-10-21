@@ -63,6 +63,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
     private var manufacturerReserved: String? = null
     var power: Byte = 0
     var serial: String = ""
+    var firmwareVersion = "02.16.00"
 
     var gattCallback: BluetoothGattServerCallback = object : BluetoothGattServerCallback() {
         override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) {
@@ -80,6 +81,12 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             Log.d("GATT", "onConnectionStateChange(device: $device, status: $status, newState: $newState)")
+//
+//            if (mGattServer != null && mGattServer!!.services != null && mGattServer!!.services.size < 3) {
+//                mGattServer!!.services.clear()
+//                configureGatt(mGattServer)
+//                Log.i("GATT","RECONFIG GATTSERVER__________________________ ")
+//            }
             super.onConnectionStateChange(device, status, newState)
             connectedDevice = device
             if (status == BluetoothGatt.STATE_CONNECTED) {
@@ -100,17 +107,18 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             super.onCharacteristicReadRequest(device, requestId, offset, characteristic)
             when (characteristic.uuid.toString()) {
                 CHARACTERISTIC_DEVICE_NAME -> mGattServer!!.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "SmartTag".toByteArray())
-                CHARACTERISTIC_FIRMWARE -> mGattServer!!.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "02.16.00".toByteArray())
+                CHARACTERISTIC_SIMULATOR -> mGattServer!!.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(0x01, 0x00))
+                CHARACTERISTIC_FIRMWARE -> mGattServer!!.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, (firmwareVersion).toByteArray())
                 CHARACTERISTIC_HARDWARE -> mGattServer!!.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, "02.00".toByteArray())
                 CHARACTERISTIC_PIN -> mGattServer!!.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(0x01, 0x00))
-                CHARACTERISTIC_SERIAL -> mGattServer ?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, serial.toByteArray())
-                CHARACTERISTIC_EVENT_DOWNLOAD -> mGattServer ?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset,
+                CHARACTERISTIC_SERIAL -> mGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, serial.toByteArray())
+                CHARACTERISTIC_EVENT_DOWNLOAD -> mGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset,
                         byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))
-                CHARACTERISTIC_CRASH_THRESHOLD -> mGattServer ?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(
+                CHARACTERISTIC_CRASH_THRESHOLD -> mGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(
                         -0x30, 0x07, 0x03, 0x00, 0x14, 0x05, 0x03, 0x00))
                 CHARACTERISTIC_ACCELERATION ->
                     calibrateAcceleration()
-                else -> mGattServer ?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(0x00, 0x00))
+                else -> mGattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(0x00, 0x00))
             }
         }
 
@@ -145,11 +153,11 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
                             System.arraycopy(time, 0, value, 2, 4)
                         }
                         System.arraycopy(value, 0, value, 0, 2)
-                        val charaDrive = mGattServer ?.getService(UUID.fromString(SERVICE_MEMORY))
+                        val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_MEMORY))
                                 ?.getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER))
                         charaDrive?.value = data
-                        if(connectedDevice==null)return
-                        mGattServer ?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
+                        if (connectedDevice == null) return
+                        mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
                     }
                 }
             }
@@ -243,6 +251,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
         var calib_z = 0
         var stopCalib = false
         const val CHARACTERISTIC_DEVICE_NAME = "00002a00-0000-1000-8000-00805f9b34fb" // SERVICE_GENERIC
+        const val CHARACTERISTIC_SIMULATOR = "11111111-1111-1111-1111-1111111111111" // SERVICE_GENERIC
         const val CHARACTERISTIC_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb" // SERVICE_BATTERY
         const val CHARACTERISTIC_SERIAL = "00002a25-0000-1000-8000-00805f9b34fb" // SERVICE_INFORMATION
         const val CHARACTERISTIC_FIRMWARE = "00002a26-0000-1000-8000-00805f9b34fb" // SERVICE_INFORMATION
@@ -312,6 +321,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
                         GattUtils.addReadCharacteristic(CHARACTERISTIC_SERIAL, service)
                         GattUtils.addReadCharacteristic(CHARACTERISTIC_FIRMWARE, service)
                         GattUtils.addReadCharacteristic(CHARACTERISTIC_HARDWARE, service)
+                        GattUtils.addReadCharacteristic(CHARACTERISTIC_SIMULATOR, service)
                     }
                     SERVICE_MEMS -> {
                         GattUtils.addNotifyCharacteristic(CHARACTERISTIC_ACCELERATION, service)
@@ -368,7 +378,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             stop = true
             val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
             charaDrive?.value = MathUtils.getBytes(1)
-            if(connectedDevice==null)return
+            if (connectedDevice == null) return
             mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
             val data = ByteArray(6)
             stop = false
@@ -383,10 +393,10 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
                     }
                     if (time == 0 || i[0] < time) {
                         MathUtils.copyBytes(data, 300 + Random().nextInt(20), 400 + Random().nextInt(20), 30)
-                        val chara = mGattServer ?.getService(UUID.fromString(SERVICE_MEMS))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION))
+                        val chara = mGattServer?.getService(UUID.fromString(SERVICE_MEMS))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION))
                         chara?.value = data
-                        if(connectedDevice==null)return
-                        mGattServer ?.notifyCharacteristicChanged(connectedDevice, chara, false)
+                        if (connectedDevice == null) return
+                        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
                         h.postDelayed(this, 1000)
                         i[0]++
                     } else {
@@ -402,7 +412,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             stop = true
             val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
             chara?.value = MathUtils.getBytes(4)
-            if(connectedDevice==null)return
+            if (connectedDevice == null) return
             mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
         }
 
@@ -410,7 +420,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             stop = true
             val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
             chara?.value = MathUtils.getBytes(2)
-            if(connectedDevice==null)return
+            if (connectedDevice == null) return
             mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
         }
 
@@ -418,7 +428,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             stop = true
             val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
             chara?.value = MathUtils.getBytes(0)
-            if(connectedDevice==null)return
+            if (connectedDevice == null) return
             mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
         }
 
@@ -443,6 +453,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             Log.i("GATT", "Calibrate Aceleration")
             stop = false
             calibrateStatus = true
+            stopCalib = false
             calibrateCallback()
             if (manualCalib) {
                 manualCalibration()
@@ -464,7 +475,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
                 if (!stopCalib) {
                     sendIdleAcceleration(calib_x, calib_y, calib_z)
                     h.postDelayed(runnable, 600)
-                }else{
+                } else {
                     h.removeCallbacks(runnable)
                 }
             }
@@ -499,22 +510,22 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
                         val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_MEMORY))
                                 ?.getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER))
                         charaDrive?.value = value
-                        if(connectedDevice==null)return
+                        if (connectedDevice == null) return
                         mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
                         index[0]++
-                        h.postDelayed(this, 50)
+                        h.postDelayed(this, 100)
                         Log.i("GATT", "crash buffer index: " + index[0])
                     } else {
                         val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
                         chara?.value = MathUtils.getBytes(26)
-                        if(connectedDevice==null)return
+                        if (connectedDevice == null) return
                         mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
                         h.removeCallbacks(this)
                         Log.i("GATT", "crash buffer end: " + index[0])
                     }
                 }
             }
-            h.postDelayed(r, 100)
+            h.post(r);
         }
 
         fun buildCrash(value: ByteArray): ByteArray {

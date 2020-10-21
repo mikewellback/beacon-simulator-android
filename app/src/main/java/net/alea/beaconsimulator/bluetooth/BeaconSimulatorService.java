@@ -66,6 +66,7 @@ import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.widget.Toast;
 
 import net.alea.beaconsimulator.ActivityMain;
@@ -460,6 +461,12 @@ public class BeaconSimulatorService extends Service {
                             B810Beacon.Companion.configureGatt(mGattServer);
                         }
                     }
+//                    else if(mGattServer.getServices().size()<3) {
+//                        BluetoothManager btManager = ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE));
+//                        mGattServer = btManager.openGattServer(BeaconSimulatorService.this, model.getB810beacon().getGattCallback());
+//                        B810Beacon.Companion.configureGatt(mGattServer);
+//                        Log.i("GATT","RECONFIG GATTSERVER__________________________");
+//                    }
                 }
             }
             sLogger.info("Success in starting broadcast, currently active: {}", mAdvertiseCallbacks.size());
