@@ -57,9 +57,6 @@ import android.widget.Toast
 import kotlinx.android.synthetic.main.card_beacon_b810beacon_edit.view.*
 import net.alea.beaconsimulator.R
 import net.alea.beaconsimulator.bluetooth.model.B810Beacon
-import net.alea.beaconsimulator.bluetooth.model.B810Beacon.Companion.sendAcceleration
-import net.alea.beaconsimulator.bluetooth.model.B810Beacon.Companion.sendCrash
-import net.alea.beaconsimulator.bluetooth.model.B810Beacon.Companion.sendParking
 import net.alea.beaconsimulator.bluetooth.model.BeaconModel
 import net.alea.beaconsimulator.util.onProgressChange
 import java.util.*
@@ -69,6 +66,7 @@ import kotlin.math.min
 class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEditor {
     private val pref: SharedPreferences = context.getSharedPreferences("crash_pref", Context.MODE_PRIVATE)
     private val edit: SharedPreferences.Editor = pref.edit()
+    var b810beaconModel: B810Beacon? = null
 
 
     init {
@@ -113,11 +111,11 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
             if (timeAccelerationEt.text.toString() != "") {
                 time = timeAccelerationEt.text.toString().toInt()
             }
-            sendAcceleration(time)
+            b810beaconModel?.sendAcceleration(time)
         }
-        stop.setOnClickListener { sendParking() }
+        stop.setOnClickListener { b810beaconModel?.sendParking() }
         crash.setOnClickListener {
-            sendCrash()
+            b810beaconModel?.sendCrash()
         }
 
         addCrash.setOnClickListener {
@@ -127,20 +125,20 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
         }
 
         calibManual.setOnCheckedChangeListener { _, checked ->
-            B810Beacon.manualCalib = checked
+            b810beaconModel?.manualCalib = checked
             enableManualCalib(if (checked) VISIBLE else GONE)
         }
 
         calib_seek.onProgressChange {
-            B810Beacon.calib_x = it
+            b810beaconModel?.calib_x = it
             calib_value.text = "$it"
         }
         calib_seekY.onProgressChange {
-            B810Beacon.calib_y = it
+            b810beaconModel?.calib_y = it
             calib_valueY.text = "$it"
         }
         calib_seekZ.onProgressChange {
-            B810Beacon.calib_z = it
+            b810beaconModel?.calib_z = it
             calib_valueZ.text = "$it"
         }
         removeCrash.setOnClickListener {
@@ -151,7 +149,7 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
 
         crashCountTxt.text = "${pref.getInt("crashCountTxt", 0)}"
 
-        B810Beacon.crashProgressCallback = {
+        b810beaconModel?.crashProgressCallback = {
             findViewById<ProgressBar>(R.id.progressCrash).progress = it
             if (it > 600) {
                 val count = max(pref.getInt("crashCountTxt", 0) - 1, 0)
@@ -160,23 +158,23 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
                 Toast.makeText(context, "sending crash completed", Toast.LENGTH_LONG).show()
                 if (pref.getInt("crashCountTxt", 0) > 0) {
                     Handler().postDelayed({
-                        sendCrash()
+                        b810beaconModel?.sendCrash()
                     }, 1000)
                 }
             }
 
         }
 
-        if (B810Beacon.connecttionStatus) {
+        if (b810beaconModel!=null && b810beaconModel!!.connecttionStatus) {
             connected_indicator.setBackgroundResource(R.drawable.connected_shape)
-            if (B810Beacon.calibrateStatus) {
+            if (b810beaconModel!=null && b810beaconModel!!.calibrateStatus) {
                 enableButtons(true)
             }
         } else {
             enableButtons(false)
             connected_indicator.setBackgroundResource(R.drawable.diconnected_shape)
         }
-        B810Beacon.connectedCallback = { connected ->
+        b810beaconModel?.connectedCallback = { connected ->
             post {
                 if (connected) {
                     connected_indicator.setBackgroundResource(R.drawable.connected_shape)
@@ -188,18 +186,18 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
 
         }
         cornering.setOnClickListener {
-            B810Beacon.sendCornering()
+            b810beaconModel?.sendCornering()
         }
         braking.setOnClickListener {
-            B810Beacon.sendBraking()
+            b810beaconModel?.sendBraking()
         }
 
-        B810Beacon.calibrateCallback = {
+        b810beaconModel?.calibrateCallback = {
             enableButtons(true)
         }
 
         stopCalibrBtn.setOnClickListener {
-            B810Beacon.stopCalib = true
+            b810beaconModel?.stopCalib = true
         }
 
 
@@ -231,14 +229,14 @@ class ViewEditB810Beacon(context: Context) : FrameLayout(context), BeaconModelEd
 
 
     override fun loadModelFrom(model: BeaconModel) {
-        val b810beacon = model.b810beacon ?: return
-        cardb810beacon_textinput_uuid.setText(b810beacon.beaconNamespace.toString())
-        cardb810beacon_textinput_major.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMajor()))
-        cardb810beacon_textinput_minor.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getMinor()))
-        firmwareVersion_texxtinput.setText(b810beacon.firmwareVersion)
+        b810beaconModel = model.b810beacon ?: return
+        cardb810beacon_textinput_uuid.setText(b810beaconModel!!.beaconNamespace.toString())
+        cardb810beacon_textinput_major.setText(String.format(Locale.ENGLISH, "%d", b810beaconModel!!.getMajor()))
+        cardb810beacon_textinput_minor.setText(String.format(Locale.ENGLISH, "%d", b810beaconModel!!.getMinor()))
+        firmwareVersion_texxtinput.setText(b810beaconModel!!.firmwareVersion)
         calculateSerial()
-        cardb810beacon_textinput_power.setText(String.format(Locale.ENGLISH, "%d", b810beacon.power))
-        cardb810beacon_textinput_manufacturerid.setText(String.format(Locale.ENGLISH, "%d", b810beacon.getManufacturerId()))
+        cardb810beacon_textinput_power.setText(String.format(Locale.ENGLISH, "%d", b810beaconModel!!.power))
+        cardb810beacon_textinput_manufacturerid.setText(String.format(Locale.ENGLISH, "%d", b810beaconModel!!.getManufacturerId()))
     }
 
     override fun saveModelTo(model: BeaconModel): Boolean {

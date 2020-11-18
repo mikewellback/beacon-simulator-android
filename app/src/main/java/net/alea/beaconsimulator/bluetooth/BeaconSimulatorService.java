@@ -119,6 +119,8 @@ public class BeaconSimulatorService extends Service {
     private Map<UUID, AdvertiseCallback> mAdvertiseCallbacks;
     private Map<UUID, Long> mAdvertiseStartTimestamp;
     private Map<UUID, PendingIntent> mScheduledPendingIntents;
+    private Map<UUID, BluetoothGattServer> mGattServers;
+    private Map<UUID, B810Beacon> models;
     private BeaconStore mBeaconStore;
 
     private BluetoothGattServer mGattServer;
@@ -164,6 +166,8 @@ public class BeaconSimulatorService extends Service {
         mAdvertiseCallbacks = new TreeMap<>();
         mAdvertiseStartTimestamp = new HashMap<>();
         mScheduledPendingIntents = new HashMap<>();
+        models = new HashMap<>();
+        mGattServers = new HashMap<>();
         mBeaconStore = ((App)getApplication()).getBeaconStore();
         registerReceiver(mBroadcastReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
         EventBus.getDefault().register(this);
@@ -323,8 +327,8 @@ public class BeaconSimulatorService extends Service {
             return;
         }
         if (mAdvertiseCallbacks.size() == 0) {
-            if (mGattServer != null) {
-                mGattServer.close();
+            if (mGattServers.get(id) != null) {
+                mGattServers.get(id).close();
             }
             stopForeground(true);
             if (! ignoreServiceStartId) {
@@ -454,11 +458,14 @@ public class BeaconSimulatorService extends Service {
 
                 final BeaconModel model = mBeaconStore.getBeacon(_id);
                 if (model != null && BeaconType.b810beacon.equals(model.getType())) {
-                    if (mGattServer == null) {
+                    if(models.get(_id)==null){
+                        models.put(_id,model.getB810beacon());
+                    }
+                    if (mGattServers.get(_id) == null) {
                         BluetoothManager btManager = ((BluetoothManager) getSystemService(BLUETOOTH_SERVICE));
                         if (btManager != null) {
-                            mGattServer = btManager.openGattServer(BeaconSimulatorService.this, model.getB810beacon().getGattCallback());
-                            B810Beacon.Companion.configureGatt(mGattServer);
+                            mGattServers.put(_id,btManager.openGattServer(BeaconSimulatorService.this, models.get(_id).getGattCallback()));
+                            models.get(_id).configureGatt(mGattServers.get(_id));
                         }
                     }
 //                    else if(mGattServer.getServices().size()<3) {

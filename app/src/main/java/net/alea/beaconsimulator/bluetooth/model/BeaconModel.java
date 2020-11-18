@@ -47,6 +47,7 @@ import android.os.Parcelable;
 import android.support.annotation.Nullable;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 
 import net.alea.beaconsimulator.bluetooth.AdvertiseDataGenerator;

@@ -65,6 +65,18 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
     var serial: String = ""
     var firmwareVersion = "02.16.00"
 
+    @Transient
+    var manualCalib = false
+    @Transient
+    var calib_x = 0
+    @Transient
+    var calib_z = 0
+    @Transient
+    var calib_y = 0
+    @Transient
+    var stopCalib = false
+
+
     var gattCallback: BluetoothGattServerCallback = object : BluetoothGattServerCallback() {
         override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) {
             super.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value)
@@ -179,6 +191,11 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
         setMinor(0)
         power = (-50).toByte()
         serial = ""
+        manualCalib = false
+        calib_x = 0
+        calib_z = 0
+        calib_y = 0
+        stopCalib = false
     }
 
     fun getMajor(): Int {
@@ -232,6 +249,7 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
         dest.writeString(serial)
         dest.writeString(manufacturerReserved)
         dest.writeByte(power)
+        dest.writeString(firmwareVersion)
     }
 
     protected constructor(`in`: Parcel) {
@@ -242,14 +260,12 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
         serial = `in`.readString()
         manufacturerReserved = `in`.readString()
         power = `in`.readByte()
+        firmwareVersion = `in`.readString()
     }
 
+
+
     companion object {
-        var manualCalib = false
-        var calib_x = 0
-        var calib_y = 0
-        var calib_z = 0
-        var stopCalib = false
         const val CHARACTERISTIC_DEVICE_NAME = "00002a00-0000-1000-8000-00805f9b34fb" // SERVICE_GENERIC
         const val CHARACTERISTIC_SIMULATOR = "11111111-1111-1111-1111-1111111111111" // SERVICE_GENERIC
         const val CHARACTERISTIC_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb" // SERVICE_BATTERY
@@ -277,73 +293,6 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
         const val BEACON_CODE = 0x215.toShort()
         const val MANUFACTURER_PACKET_SIZE = 23
         var k_G_TO_MS2 = 0.00980665
-        var stop = false
-        private var mGattServer: BluetoothGattServer? = null
-        private var connectedDevice: BluetoothDevice? = null
-        fun configureGatt(gattServer: BluetoothGattServer?) {
-            mGattServer = gattServer
-            configureGatt(gattServer, null)
-        }
-
-        var crashProgressCallback: (value: Int) -> Unit = {}
-        var connectedCallback: (value: Boolean) -> Unit = {}
-        var calibrateCallback: () -> Unit = {}
-        var connecttionStatus = false
-        var calibrateStatus = false
-
-
-        private fun configureGatt(gattServer: BluetoothGattServer?, addedService: String?) {
-            val service_uuids = arrayOf( //SERVICE_GENERIC,
-                    SERVICE_INFORMATION,
-                    SERVICE_BATTERY,
-                    SERVICE_MEMS,
-                    SERVICE_CONFIG,
-                    SERVICE_DRIVING,
-                    SERVICE_MEMORY)
-            var uuid: String? = null
-            if (addedService == null) {
-                uuid = service_uuids[0]
-            } else {
-                for (i in 0 until service_uuids.size - 1) {
-                    if (service_uuids[i] == addedService) {
-                        uuid = service_uuids[i + 1]
-                        break
-                    }
-                }
-            }
-            if (uuid != null) {
-                //for (String uuid: service_uuids) {
-                val service = GattUtils.createPrimaryService(uuid)
-                when (uuid) {
-                    SERVICE_GENERIC -> GattUtils.addWriteCharacteristic(CHARACTERISTIC_DEVICE_NAME, service)
-                    SERVICE_BATTERY -> GattUtils.addReadCharacteristic(CHARACTERISTIC_BATTERY_LEVEL, service)
-                    SERVICE_INFORMATION -> {
-                        GattUtils.addReadCharacteristic(CHARACTERISTIC_SERIAL, service)
-                        GattUtils.addReadCharacteristic(CHARACTERISTIC_FIRMWARE, service)
-                        GattUtils.addReadCharacteristic(CHARACTERISTIC_HARDWARE, service)
-                        GattUtils.addReadCharacteristic(CHARACTERISTIC_SIMULATOR, service)
-                    }
-                    SERVICE_MEMS -> {
-                        GattUtils.addNotifyCharacteristic(CHARACTERISTIC_ACCELERATION, service)
-                        GattUtils.addWriteCharacteristic(CHARACTERISTIC_CALIBRATION, service)
-                    }
-                    SERVICE_CONFIG -> {
-                        GattUtils.addNotifyCharacteristic(CHARACTERISTIC_STATUS, service)
-                        GattUtils.addWriteCharacteristic(CHARACTERISTIC_SPEED, service)
-                        GattUtils.addWriteCharacteristic(CHARACTERISTIC_TIMESTAMP, service)
-                        GattUtils.addWriteCharacteristic(CHARACTERISTIC_PIN, service)
-                    }
-                    SERVICE_DRIVING -> GattUtils.addWriteCharacteristic(CHARACTERISTIC_CRASH_THRESHOLD, service)
-                    SERVICE_MEMORY -> {
-                        GattUtils.addNotifyCharacteristic(CHARACTERISTIC_CRASH_BUFFER, service)
-                        GattUtils.addWriteCharacteristic(CHARACTERISTIC_CRASH_DOWNLOAD, service)
-                        GattUtils.addReadCharacteristic(CHARACTERISTIC_EVENT_DOWNLOAD, service)
-                        GattUtils.addWriteCharacteristic(CHARACTERISTIC_ANOMALIES, service)
-                    }
-                }
-                gattServer?.addService(service)
-            }
-        }
 
         fun parseRecord(scanRecord: ScanRecord): B810Beacon? {
             // Check data validity
@@ -374,71 +323,6 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
             return b810beacon
         }
 
-        fun sendAcceleration(time: Int) {
-            stop = true
-            val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
-            charaDrive?.value = MathUtils.getBytes(1)
-            if (connectedDevice == null) return
-            mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
-            val data = ByteArray(6)
-            stop = false
-            val h = Handler(Looper.getMainLooper())
-            val i = intArrayOf(0)
-            val r: Runnable = object : Runnable {
-                override fun run() {
-                    if (stop) {
-                        h.removeCallbacks(this)
-                        sendParking()
-                        return
-                    }
-                    if (time == 0 || i[0] < time) {
-                        MathUtils.copyBytes(data, 300 + Random().nextInt(20), 400 + Random().nextInt(20), 30)
-                        val chara = mGattServer?.getService(UUID.fromString(SERVICE_MEMS))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION))
-                        chara?.value = data
-                        if (connectedDevice == null) return
-                        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-                        h.postDelayed(this, 1000)
-                        i[0]++
-                    } else {
-                        sendParking()
-                        h.removeCallbacks(this)
-                    }
-                }
-            }
-            h.postDelayed(r, 1000)
-        }
-
-        fun sendCornering() {
-            stop = true
-            val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
-            chara?.value = MathUtils.getBytes(4)
-            if (connectedDevice == null) return
-            mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-        }
-
-        fun sendBraking() {
-            stop = true
-            val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
-            chara?.value = MathUtils.getBytes(2)
-            if (connectedDevice == null) return
-            mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-        }
-
-        fun sendParking() {
-            stop = true
-            val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
-            chara?.value = MathUtils.getBytes(0)
-            if (connectedDevice == null) return
-            mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-        }
-
-        fun sendCrash() {
-            stop = true
-            val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
-            chara?.value = MathUtils.getBytes(6)
-            mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-        }
-
         val CREATOR: Parcelable.Creator<B810Beacon?> = object : Parcelable.Creator<B810Beacon?> {
             override fun createFromParcel(source: Parcel): B810Beacon? {
                 return B810Beacon(source)
@@ -448,100 +332,243 @@ class B810Beacon : AdvertiseDataGenerator, Parcelable {
                 return arrayOfNulls(size)
             }
         }
+    }
 
-        fun calibrateAcceleration() {
-            Log.i("GATT", "Calibrate Aceleration")
-            stop = false
-            calibrateStatus = true
-            stopCalib = false
-            calibrateCallback()
-            if (manualCalib) {
-                manualCalibration()
-            } else {
-                for (i in 1..10) {
-                    if (stop) {
-                        return
-                    }
-                    sendIdleAcceleration(1000 - (i * 100), 1000 - (i * 100))
-                    Thread.sleep(600)
+    @Transient
+    var stop = false
+    @Transient
+    public var mGattServer: BluetoothGattServer? = null
+    @Transient
+    private var connectedDevice: BluetoothDevice? = null
+    fun configureGatt(gattServer: BluetoothGattServer?) {
+        mGattServer = gattServer
+        configureGatt(gattServer, null)
+    }
+
+    @Transient
+    var crashProgressCallback: (value: Int) -> Unit = {}
+    @Transient
+    var connectedCallback: (value: Boolean) -> Unit = {}
+    @Transient
+    var calibrateCallback: () -> Unit = {}
+    @Transient
+    var connecttionStatus = false
+    @Transient
+    var calibrateStatus = false
+
+
+    private fun configureGatt(gattServer: BluetoothGattServer?, addedService: String?) {
+        val service_uuids = arrayOf( //SERVICE_GENERIC,
+                SERVICE_INFORMATION,
+                SERVICE_BATTERY,
+                SERVICE_MEMS,
+                SERVICE_CONFIG,
+                SERVICE_DRIVING,
+                SERVICE_MEMORY)
+        var uuid: String? = null
+        if (addedService == null) {
+            uuid = service_uuids[0]
+        } else {
+            for (i in 0 until service_uuids.size - 1) {
+                if (service_uuids[i] == addedService) {
+                    uuid = service_uuids[i + 1]
+                    break
                 }
             }
         }
+        if (uuid != null) {
+            //for (String uuid: service_uuids) {
+            val service = GattUtils.createPrimaryService(uuid)
+            when (uuid) {
+                SERVICE_GENERIC -> GattUtils.addWriteCharacteristic(CHARACTERISTIC_DEVICE_NAME, service)
+                SERVICE_BATTERY -> GattUtils.addReadCharacteristic(CHARACTERISTIC_BATTERY_LEVEL, service)
+                SERVICE_INFORMATION -> {
+                    GattUtils.addReadCharacteristic(CHARACTERISTIC_SERIAL, service)
+                    GattUtils.addReadCharacteristic(CHARACTERISTIC_FIRMWARE, service)
+                    GattUtils.addReadCharacteristic(CHARACTERISTIC_HARDWARE, service)
+                    GattUtils.addReadCharacteristic(CHARACTERISTIC_SIMULATOR, service)
+                }
+                SERVICE_MEMS -> {
+                    GattUtils.addNotifyCharacteristic(CHARACTERISTIC_ACCELERATION, service)
+                    GattUtils.addWriteCharacteristic(CHARACTERISTIC_CALIBRATION, service)
+                }
+                SERVICE_CONFIG -> {
+                    GattUtils.addNotifyCharacteristic(CHARACTERISTIC_STATUS, service)
+                    GattUtils.addWriteCharacteristic(CHARACTERISTIC_SPEED, service)
+                    GattUtils.addWriteCharacteristic(CHARACTERISTIC_TIMESTAMP, service)
+                    GattUtils.addWriteCharacteristic(CHARACTERISTIC_PIN, service)
+                }
+                SERVICE_DRIVING -> GattUtils.addWriteCharacteristic(CHARACTERISTIC_CRASH_THRESHOLD, service)
+                SERVICE_MEMORY -> {
+                    GattUtils.addNotifyCharacteristic(CHARACTERISTIC_CRASH_BUFFER, service)
+                    GattUtils.addWriteCharacteristic(CHARACTERISTIC_CRASH_DOWNLOAD, service)
+                    GattUtils.addReadCharacteristic(CHARACTERISTIC_EVENT_DOWNLOAD, service)
+                    GattUtils.addWriteCharacteristic(CHARACTERISTIC_ANOMALIES, service)
+                }
+            }
+            gattServer?.addService(service)
+        }
+    }
 
-        fun manualCalibration() {
-            val h = Handler(Looper.getMainLooper())
-            lateinit var runnable: Runnable
-            runnable = Runnable {
-                if (!stopCalib) {
-                    sendIdleAcceleration(calib_x, calib_y, calib_z)
-                    h.postDelayed(runnable, 600)
+
+
+    fun sendAcceleration(time: Int) {
+        stop = true
+        val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
+        charaDrive?.value = MathUtils.getBytes(1)
+        if (connectedDevice == null) return
+        mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
+        val data = ByteArray(6)
+        stop = false
+        val h = Handler(Looper.getMainLooper())
+        val i = intArrayOf(0)
+        val r: Runnable = object : Runnable {
+            override fun run() {
+                if (stop) {
+                    h.removeCallbacks(this)
+                    sendParking()
+                    return
+                }
+                if (time == 0 || i[0] < time) {
+                    MathUtils.copyBytes(data, 300 + Random().nextInt(20), 400 + Random().nextInt(20), 30)
+                    val chara = mGattServer?.getService(UUID.fromString(SERVICE_MEMS))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION))
+                    chara?.value = data
+                    if (connectedDevice == null) return
+                    mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+                    h.postDelayed(this, 1000)
+                    i[0]++
                 } else {
-                    h.removeCallbacks(runnable)
+                    sendParking()
+                    h.removeCallbacks(this)
                 }
             }
-            h.post(runnable)
-
         }
+        h.postDelayed(r, 1000)
+    }
 
-        fun sendIdleAcceleration(x: Int = 0, y: Int = 0, z: Int = 950) {
-            val data = ByteArray(6)
-            MathUtils.copyBytes(data, x, y, z)
-            val chara = mGattServer?.getService(UUID.fromString(SERVICE_MEMS))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION))
-            chara?.value = data
-            mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-            Log.i("GATT: ", "send acceleration =" + Arrays.toString(data))
+    fun sendCornering() {
+        stop = true
+        val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
+        chara?.value = MathUtils.getBytes(4)
+        if (connectedDevice == null) return
+        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+    }
+
+    fun sendBraking() {
+        stop = true
+        val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
+        chara?.value = MathUtils.getBytes(2)
+        if (connectedDevice == null) return
+        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+    }
+
+    fun sendParking() {
+        stop = true
+        val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
+        chara?.value = MathUtils.getBytes(0)
+        if (connectedDevice == null) return
+        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+    }
+
+    fun sendCrash() {
+        stop = true
+        val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
+        chara?.value = MathUtils.getBytes(6)
+        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+    }
+
+
+
+    fun calibrateAcceleration() {
+        Log.i("GATT", "Calibrate Aceleration")
+        stop = false
+        calibrateStatus = true
+        stopCalib = false
+        calibrateCallback()
+        if (manualCalib) {
+            manualCalibration()
+        } else {
+            for (i in 1..10) {
+                if (stop) {
+                    return
+                }
+                sendIdleAcceleration(1000 - (i * 100), 1000 - (i * 100))
+                Thread.sleep(600)
+            }
         }
+    }
+
+    fun manualCalibration() {
+        val h = Handler(Looper.getMainLooper())
+        lateinit var runnable: Runnable
+        runnable = Runnable {
+            if (!stopCalib) {
+                sendIdleAcceleration(calib_x, calib_y, calib_z)
+                h.postDelayed(runnable, 600)
+            } else {
+                h.removeCallbacks(runnable)
+            }
+        }
+        h.post(runnable)
+
+    }
+
+    fun sendIdleAcceleration(x: Int = 0, y: Int = 0, z: Int = 950) {
+        val data = ByteArray(6)
+        MathUtils.copyBytes(data, x, y, z)
+        val chara = mGattServer?.getService(UUID.fromString(SERVICE_MEMS))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_ACCELERATION))
+        chara?.value = data
+        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+        Log.i("GATT: ", "send acceleration =" + Arrays.toString(data))
+    }
 
 
-        private fun sendCrashBuffer() {
-            val index = intArrayOf(1)
-            val h = Handler(Looper.getMainLooper())
-            Log.i("GATT", "crash buffer start")
-            val r: Runnable = object : Runnable {
-                override fun run() {
-                    if (index[0] <= 601) {
-                        val value = byteArrayOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-                        crashProgressCallback(index[0])
-                        if (index[0] > 599) {
-                            val time = MathUtils.getBytes(System.currentTimeMillis())
-                            System.arraycopy(time, 0, value, 2, 4)
-                        }
-                        System.arraycopy(MathUtils.getBytes(index[0]), 0, value, 0, 2)
-                        val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_MEMORY))
-                                ?.getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER))
-                        charaDrive?.value = value
-                        if (connectedDevice == null) return
-                        mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
-                        index[0]++
-                        h.postDelayed(this, 100)
-                        Log.i("GATT", "crash buffer index: " + index[0])
-                    } else {
-                        val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
-                        chara?.value = MathUtils.getBytes(26)
-                        if (connectedDevice == null) return
-                        mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
-                        h.removeCallbacks(this)
-                        Log.i("GATT", "crash buffer end: " + index[0])
+    private fun sendCrashBuffer() {
+        val index = intArrayOf(1)
+        val h = Handler(Looper.getMainLooper())
+        Log.i("GATT", "crash buffer start")
+        val r: Runnable = object : Runnable {
+            override fun run() {
+                if (index[0] <= 601) {
+                    val value = byteArrayOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+                    crashProgressCallback(index[0])
+                    if (index[0] > 599) {
+                        val time = MathUtils.getBytes(System.currentTimeMillis())
+                        System.arraycopy(time, 0, value, 2, 4)
                     }
+                    System.arraycopy(MathUtils.getBytes(index[0]), 0, value, 0, 2)
+                    val charaDrive = mGattServer?.getService(UUID.fromString(SERVICE_MEMORY))
+                            ?.getCharacteristic(UUID.fromString(CHARACTERISTIC_CRASH_BUFFER))
+                    charaDrive?.value = value
+                    if (connectedDevice == null) return
+                    mGattServer?.notifyCharacteristicChanged(connectedDevice, charaDrive, false)
+                    index[0]++
+                    h.postDelayed(this, 100)
+                    Log.i("GATT", "crash buffer index: " + index[0])
+                } else {
+                    val chara = mGattServer?.getService(UUID.fromString(SERVICE_CONFIG))?.getCharacteristic(UUID.fromString(CHARACTERISTIC_STATUS))
+                    chara?.value = MathUtils.getBytes(26)
+                    if (connectedDevice == null) return
+                    mGattServer?.notifyCharacteristicChanged(connectedDevice, chara, false)
+                    h.removeCallbacks(this)
+                    Log.i("GATT", "crash buffer end: " + index[0])
                 }
             }
-            h.post(r);
         }
+        h.post(r);
+    }
 
-        fun buildCrash(value: ByteArray): ByteArray {
-            val data = byteArrayOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-            if (MathUtils.getInt(value) > 599) {
-                val time = MathUtils.getBytes(System.currentTimeMillis())
-                System.arraycopy(time, 0, value, 2, 4)
-            }
-            System.arraycopy(value, 0, value, 0, 2)
-            return data
+    fun buildCrash(value: ByteArray): ByteArray {
+        val data = byteArrayOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        if (MathUtils.getInt(value) > 599) {
+            val time = MathUtils.getBytes(System.currentTimeMillis())
+            System.arraycopy(time, 0, value, 2, 4)
         }
+        System.arraycopy(value, 0, value, 0, 2)
+        return data
+    }
 
-        fun automaticCalibration() {
-
-        }
-
+    fun automaticCalibration() {
 
     }
 }
